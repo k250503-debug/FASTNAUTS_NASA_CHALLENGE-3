@@ -8,6 +8,7 @@ import {
   Flag,
   Flame,
   Globe,
+  MapPin,
   Mic,
   Rocket,
   ShieldAlert,
@@ -25,11 +26,56 @@ import {
   createContactShadowTexture,
   createNasaSpaceshipMesh,
   createPlantedFlagMesh,
+  setShipAirlockAndRamp,
 } from './models';
-import { createTerrainAndSkyGroup, getPlanetEnvironmentSpec } from './terrain';
+import { createTerrainAndSkyGroup, getPlanetEnvironmentSpec, groundHeightAt } from './terrain';
 import type { PlanetId } from '../types';
 
 export type LaunchStageId = 'boarding' | 'transit' | 'landing' | 'disembark';
+
+export interface FlagLandingChoice {
+  siteLabel: string;
+  outpostX: number;
+  outpostZ: number;
+}
+
+export const LANDED_SHIP_YAW = -0.52;
+
+interface FlagPreset {
+  id: string;
+  siteLabel: string;
+  localX: number;
+  localZ: number;
+  outpostX: number;
+  outpostZ: number;
+}
+
+const FLAG_SITE_PRESETS: FlagPreset[] = [
+  {
+    id: 'overlook',
+    siteLabel: 'Outpost Perimeter Overlook',
+    localX: 2.35,
+    localZ: 3.1,
+    outpostX: 8.8,
+    outpostZ: 8.2,
+  },
+  {
+    id: 'north_ridge',
+    siteLabel: 'North Crater Horizon',
+    localX: -2.15,
+    localZ: 3.4,
+    outpostX: -8.6,
+    outpostZ: 9.8,
+  },
+  {
+    id: 'pad_beacon',
+    siteLabel: 'Starship Touchdown Pad',
+    localX: 3.3,
+    localZ: 1.9,
+    outpostX: 15.2,
+    outpostZ: 6.4,
+  },
+];
 
 interface MissionLaunchSceneProps {
   planetId: PlanetId;
@@ -37,13 +83,13 @@ interface MissionLaunchSceneProps {
   startStage?: 'boarding' | 'transit';
   isAudioMuted: boolean;
   onToggleAudio?: () => void;
-  onComplete: () => void;
+  onComplete: (flagChoice: FlagLandingChoice) => void;
 }
 
-const BOARDING_DURATION = 4.6;
+const BOARDING_DURATION = 5.4;
 const TRANSIT_DURATION = 30.0;
 const LANDING_DURATION = 6.5;
-const DISEMBARK_DURATION = 9.2;
+const DISEMBARK_DURATION = 9.4;
 const TOTAL_DURATION =
   BOARDING_DURATION + TRANSIT_DURATION + LANDING_DURATION + DISEMBARK_DURATION;
 
@@ -59,49 +105,49 @@ const NASA_FLIGHT_BRIEFINGS: Record<PlanetId, NasaFlightBriefing> = {
   moon: {
     officerName: 'Flight Officer Elena Vance · NASA Capcom',
     etaLabel: '3 Days (72 hrs) · 384,400 km',
-    weatherLabel: 'Vacuum, -170°C to +120°C swings, charged regolith dust haze',
+    weatherLabel: 'Vacuum, -170°C to +120°C swings, charged regolith dust & eclipses',
     precautionsLabel:
-      'Seal visor locks, inspect storm flues for electrostatic dust, monitor battery reserves in crater shadow.',
+      'Seal visor locks, inspect storm flues for electrostatic dust, and maintain battery reserves for solar eclipses.',
     spokenScript:
-      'Attention crew, this is NASA Mission Control Flight Officer Elena Vance. Estimated transit time to the Lunar South Pole at Shackleton Crater is three days, seventy-two hours total. Expect hard vacuum conditions with extreme thermal swings from minus one hundred seventy to plus one hundred twenty degrees Celsius, plus charged lunar dust kicked up at touchdown. Required precautions: keep EVA suits sealed, inspect the storm flue immediately after landing, and monitor battery reserves before entering shadowed crater zones.',
+      'Attention crew, this is NASA Mission Control Flight Officer Elena Vance. Estimated transit time to the Lunar South Pole at Shackleton Crater is three days, seventy-two hours total. Expect hard vacuum conditions with extreme thermal swings, Permanently Shadowed Regions rich in water ice, and periodic solar eclipses. Keep EVA suits sealed, inspect the storm flue immediately after landing, and monitor battery reserves.',
   },
   mars: {
     officerName: 'Flight Officer Elena Vance · NASA Capcom',
     etaLabel: '7 Months (210 days) · 225M km',
-    weatherLabel: 'Thin CO₂ (0.6 kPa), -63°C, active iron-oxide dust storm',
+    weatherLabel: 'Thin CO₂ (0.65 kPa), -63°C, active iron-oxide dust storm',
     precautionsLabel:
-      'Clear storm flue intake post-landing, verify O₂ scrubbers, and switch to backup batteries during dust opacity.',
+      'Clear storm flue intake post-landing, verify O₂ scrubbers, and shelter during dust fronts.',
     spokenScript:
-      'Attention crew, this is NASA Mission Control Flight Officer Elena Vance. Estimated interplanetary travel time to Jezero Crater on Mars is seven months, two hundred ten days. Surface telemetry shows thin carbon dioxide atmosphere at minus sixty-three degrees Celsius, with an active iron-oxide dust storm reducing solar yield. Required precautions: keep helmets locked, clear the storm flue immediately upon touchdown, verify oxygen scrubbers, and watch backup battery levels until the storm clears.',
+      'Attention crew, this is NASA Mission Control Flight Officer Elena Vance. Estimated interplanetary travel time to Jezero Crater on Mars is seven months, two hundred ten days. Surface telemetry shows thin carbon dioxide atmosphere at minus sixty-three degrees Celsius, with an active iron-oxide dust storm reducing solar yield. Clear the storm flue immediately upon touchdown and maintain shelter readiness.',
   },
   titan: {
     officerName: 'Flight Officer Elena Vance · NASA Capcom',
     etaLabel: '6 Years (2,190 days) · 1.2B km',
     weatherLabel: 'Dense 145 kPa N₂-CH₄ haze, -179°C cryogenic methane squalls',
     precautionsLabel:
-      'Engage thermal suit heaters, purge frozen methane from storm flues, and rely on nuclear or stored power.',
+      'Engage thermal suit heaters, survey liquid methane shore via Dragonfly drone, and clear cryo frost from flues.',
     spokenScript:
-      'Attention crew, this is NASA Mission Control Flight Officer Elena Vance. Estimated deep-space travel time to Titan is six years, two thousand one hundred ninety days. Weather sensors confirm a dense nitrogen-methane atmosphere at minus one hundred seventy-nine degrees Celsius with cryogenic wind squalls and thick orange haze blocking ninety percent of sunlight. Required precautions: engage suit thermal heaters prior to EVA, purge frozen methane frost from all storm flues, and conserve stored battery reserves.',
+      'Attention crew, this is NASA Mission Control Flight Officer Elena Vance. Estimated deep-space travel time to Titan is six years. Weather sensors confirm a dense nitrogen-methane atmosphere at minus one hundred seventy-nine degrees Celsius with liquid hydrocarbon lakes and orange haze. Engage thermal heaters and deploy the Dragonfly rotorcraft after touchdown.',
   },
   europa: {
     officerName: 'Flight Officer Elena Vance · NASA Capcom',
     etaLabel: '5 Years (1,825 days) · 628M km',
     weatherLabel: 'Cryogenic -160°C ice crust, cryo-plumes, high Jovian radiation',
     precautionsLabel:
-      'Limit EVA windows, shelter during Jovian radiation spikes, and de-ice storm flues and solar arrays.',
+      'Limit EVA windows, shelter during Jovian radiation surges, and sterilize cryo-drill hardware.',
     spokenScript:
-      'Attention crew, this is NASA Mission Control Flight Officer Elena Vance. Estimated transit time to Jupiter’s moon Europa is five years, one thousand eight hundred twenty-five days. Expect a cryogenic minus one hundred sixty degree Celsius fractured ice surface, active vapor plumes, and intense Jovian radiation belts. Required precautions: limit surface EVA windows, prioritize radiation shelter integrity, and keep storm flues clear of ice accumulation.',
+      'Attention crew, this is NASA Mission Control Flight Officer Elena Vance. Estimated transit time to Jupiter’s moon Europa is five years. Expect a cryogenic minus one hundred sixty degree Celsius fractured ice surface, active vapor plumes, and intense Jovian radiation belts. Prioritize radiation shelter integrity and keep storm flues clear of ice.',
   },
 };
 
-// Pre-allocated math helpers outside render loop (zero GC)
 const _camPos = new THREE.Vector3();
 const _camLook = new THREE.Vector3();
 const _shipPos = new THREE.Vector3();
 const _shipNext = new THREE.Vector3();
 const _shipDir = new THREE.Vector3();
-const _upVec = new THREE.Vector3(0, 1, 0);
-const _quat = new THREE.Quaternion();
+const _sideAxis = new THREE.Vector3();
+const _fwdAxis = new THREE.Vector3();
+const _basisMat = new THREE.Matrix4();
 const _skyColor = new THREE.Color();
 const _fogColor = new THREE.Color();
 
@@ -259,14 +305,7 @@ function createLaunchpadDeckTexture(maxAnisotropy: number): THREE.CanvasTexture 
   return tex;
 }
 
-function createFlameAssembly(): {
-  group: THREE.Group;
-  coreCone: THREE.Mesh;
-  outerCone: THREE.Mesh;
-  coreMat: THREE.MeshBasicMaterial;
-  outerMat: THREE.MeshBasicMaterial;
-  light: THREE.PointLight;
-} {
+function createFlameAssembly() {
   const group = new THREE.Group();
 
   const coreGeo = new THREE.ConeGeometry(0.44, 3.1, 20);
@@ -315,32 +354,16 @@ function createFireSpriteTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-function getStormOverlayRgba(planetId: PlanetId): { haze: string; streak: string; label: string } {
+function getStormOverlayRgba(planetId: PlanetId): { haze: string; streak: string } {
   switch (planetId) {
     case 'mars':
-      return {
-        haze: 'rgba(217, 107, 56, 0.30)',
-        streak: 'rgba(253, 186, 116, 0.16)',
-        label: 'Iron-Oxide Dust Squall',
-      };
+      return { haze: 'rgba(217, 107, 56, 0.30)', streak: 'rgba(253, 186, 116, 0.16)' };
     case 'titan':
-      return {
-        haze: 'rgba(234, 179, 8, 0.28)',
-        streak: 'rgba(253, 224, 71, 0.15)',
-        label: 'Cryo-Methane Crosswind',
-      };
+      return { haze: 'rgba(234, 179, 8, 0.28)', streak: 'rgba(253, 224, 71, 0.15)' };
     case 'europa':
-      return {
-        haze: 'rgba(186, 230, 253, 0.26)',
-        streak: 'rgba(224, 242, 254, 0.16)',
-        label: 'Subsurface Vapor Mist',
-      };
+      return { haze: 'rgba(186, 230, 253, 0.26)', streak: 'rgba(224, 242, 254, 0.16)' };
     default:
-      return {
-        haze: 'rgba(148, 163, 184, 0.24)',
-        streak: 'rgba(226, 232, 240, 0.14)',
-        label: 'Charged Regolith Plume',
-      };
+      return { haze: 'rgba(148, 163, 184, 0.24)', streak: 'rgba(226, 232, 240, 0.14)' };
   }
 }
 
@@ -380,12 +403,18 @@ export default function MissionLaunchScene({
   const [boardedCount, setBoardedCount] = useState(0);
   const [disembarkedCount, setDisembarkedCount] = useState(0);
   const [flagPlanted, setFlagPlanted] = useState(false);
+  const [selectedFlagId, setSelectedFlagId] = useState<string>(FLAG_SITE_PRESETS[0].id);
   const [progressPct, setProgressPct] = useState(0);
   const [transitRemainingSec, setTransitRemainingSec] = useState(Math.ceil(TRANSIT_DURATION));
   const [touchdownReady, setTouchdownReady] = useState(false);
   const [stormOverlayLevel, setStormOverlayLevel] = useState(0);
   const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
   const [selectedVoiceLabel, setSelectedVoiceLabel] = useState('Flight Officer Elena Vance');
+
+  const selectedFlagPreset =
+    FLAG_SITE_PRESETS.find((f) => f.id === selectedFlagId) || FLAG_SITE_PRESETS[0];
+  const selectedFlagRef = useRef(selectedFlagPreset);
+  selectedFlagRef.current = selectedFlagPreset;
 
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
@@ -426,7 +455,7 @@ export default function MissionLaunchScene({
       if (spokenStageKeyRef.current !== key) {
         spokenStageKeyRef.current = key;
         speakBriefing(
-          `Touchdown confirmed on ${planet.name}. Crew disembarking onto the surface. Commander Abubakr, deploy the flag and begin storm flue inspection.`,
+          `Touchdown confirmed on ${planet.name}. Airlock open and ramp deployed. Crew disembarking onto the surface. Commander Abubakr, plant the expedition flag and begin storm flue inspection.`,
           false
         );
       }
@@ -454,7 +483,12 @@ export default function MissionLaunchScene({
         powerPreference: 'high-performance',
       });
     } catch {
-      onCompleteRef.current();
+      const chosen = selectedFlagRef.current;
+      onCompleteRef.current({
+        siteLabel: chosen.siteLabel,
+        outpostX: chosen.outpostX,
+        outpostZ: chosen.outpostZ,
+      });
       return;
     }
 
@@ -509,7 +543,7 @@ export default function MissionLaunchScene({
     const disposables: Array<{ dispose: () => void }> = [shadowTex];
 
     // =========================================================================
-    // ACT 1: EARTH LAUNCHPAD & ALL 6 ASTRONAUTS BOARDING THE SPACESHIP
+    // ACT 1: EARTH LAUNCHPAD & SMOOTH CREW BOARDING + IGNITION LIFTOFF
     // =========================================================================
     const boardingGroup = new THREE.Group();
     scene.add(boardingGroup);
@@ -530,19 +564,14 @@ export default function MissionLaunchScene({
       metalness: 0.65,
     });
     const walkway = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.16, 8.6), rampMat);
-    walkway.position.set(0, 0.08, 5.5);
+    walkway.position.set(0, 0.08, 6.4);
     walkway.receiveShadow = true;
     boardingGroup.add(walkway);
-
-    const bridge = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.12, 2.1), rampMat);
-    bridge.position.set(0, 1.08, 2.15);
-    bridge.rotation.x = -0.52;
-    boardingGroup.add(bridge);
 
     const railGlowMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
     for (const sx of [-1.05, 1.05]) {
       const strip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 8.2), railGlowMat);
-      strip.position.set(sx, 0.22, 5.5);
+      strip.position.set(sx, 0.22, 6.4);
       boardingGroup.add(strip);
     }
 
@@ -562,16 +591,11 @@ export default function MissionLaunchScene({
     boardingGroup.add(umbilicalArm);
 
     const shipBoarding = createNasaSpaceshipMesh(shadowTex, maxAnisotropy);
+    const liftoffFlame = createFlameAssembly();
+    liftoffFlame.group.position.set(0, 0.35, 0);
+    liftoffFlame.group.visible = false;
+    shipBoarding.add(liftoffFlame.group);
     boardingGroup.add(shipBoarding);
-
-    const airlockGlowMat = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0.88,
-    });
-    const airlockPortal = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.96), airlockGlowMat);
-    airlockPortal.position.set(0, 2.58, 1.4);
-    boardingGroup.add(airlockPortal);
 
     const padStarCount = 360;
     const padStarPos = new Float32Array(padStarCount * 3);
@@ -585,29 +609,27 @@ export default function MissionLaunchScene({
     }
     const padStarsGeo = new THREE.BufferGeometry();
     padStarsGeo.setAttribute('position', new THREE.BufferAttribute(padStarPos, 3));
-    const padStars = new THREE.Points(
-      padStarsGeo,
-      new THREE.PointsMaterial({ color: 0xe2e8f0, size: 0.38, transparent: true, opacity: 0.8 })
+    boardingGroup.add(
+      new THREE.Points(
+        padStarsGeo,
+        new THREE.PointsMaterial({ color: 0xe2e8f0, size: 0.38, transparent: true, opacity: 0.8 })
+      )
     );
-    boardingGroup.add(padStars);
 
+    // Crew walks along walkway -> up the attached boarding ramp -> straight into the open cabin bay at 1.0 scale
     const boardingCrew = ASTRONAUTS.map((profile, idx) => {
       const mesh = createAstronautMesh(profile, shadowTex, false);
-      const startZ = 3.0 + idx * 1.15;
-      const laneX = idx % 2 === 0 ? -0.34 : 0.34;
+      const startZ = 4.4 + idx * 1.05;
+      const laneX = idx % 2 === 0 ? -0.3 : 0.3;
       mesh.position.set(laneX, 0.16, startZ);
       mesh.rotation.y = Math.PI;
+      mesh.scale.setScalar(1);
       boardingGroup.add(mesh);
-      return {
-        profile,
-        mesh,
-        startZ,
-        laneX,
-      };
+      return { profile, mesh, startZ, laneX };
     });
 
     // =========================================================================
-    // ACT 2: EARTH TO DESTINATION PLANET TRANSIT IN DEEP SPACE (30s)
+    // ACT 2: EARTH TO DESTINATION PLANET TRANSIT (30s, Stable Orientation)
     // =========================================================================
     const transitGroup = new THREE.Group();
     scene.add(transitGroup);
@@ -624,11 +646,9 @@ export default function MissionLaunchScene({
     }
     const spaceStarsGeo = new THREE.BufferGeometry();
     spaceStarsGeo.setAttribute('position', new THREE.BufferAttribute(spaceStarPos, 3));
-    const spaceStars = new THREE.Points(
-      spaceStarsGeo,
-      new THREE.PointsMaterial({ color: 0xf8fafc, size: 0.42, fog: false })
+    transitGroup.add(
+      new THREE.Points(spaceStarsGeo, new THREE.PointsMaterial({ color: 0xf8fafc, size: 0.42, fog: false }))
     );
-    transitGroup.add(spaceStars);
 
     const streakCount = 64;
     const streakPositions = new Float32Array(streakCount * 6);
@@ -640,11 +660,12 @@ export default function MissionLaunchScene({
     }
     const streakGeo = new THREE.BufferGeometry();
     streakGeo.setAttribute('position', new THREE.BufferAttribute(streakPositions, 3));
-    const streakLines = new THREE.LineSegments(
-      streakGeo,
-      new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.45, fog: false })
+    transitGroup.add(
+      new THREE.LineSegments(
+        streakGeo,
+        new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.45, fog: false })
+      )
     );
-    transitGroup.add(streakLines);
 
     const earthTex = createEarthTexture(maxAnisotropy);
     disposables.push(earthTex);
@@ -724,6 +745,7 @@ export default function MissionLaunchScene({
 
     const shipTransit = createNasaSpaceshipMesh(shadowTex, maxAnisotropy);
     shipTransit.scale.setScalar(0.75);
+    setShipAirlockAndRamp(shipTransit, 0, 0);
     const transitFlame = createFlameAssembly();
     transitFlame.group.position.set(0, 0.35, 0);
     shipTransit.add(transitFlame.group);
@@ -733,20 +755,21 @@ export default function MissionLaunchScene({
     const sparkPositions = new Float32Array(sparkCount * 3);
     const sparkGeo = new THREE.BufferGeometry();
     sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
-    const sparkPoints = new THREE.Points(
-      sparkGeo,
-      new THREE.PointsMaterial({
-        color: 0xfb923c,
-        size: 0.28,
-        transparent: true,
-        opacity: 0.85,
-        fog: false,
-      })
+    transitGroup.add(
+      new THREE.Points(
+        sparkGeo,
+        new THREE.PointsMaterial({
+          color: 0xfb923c,
+          size: 0.28,
+          transparent: true,
+          opacity: 0.85,
+          fog: false,
+        })
+      )
     );
-    transitGroup.add(sparkPoints);
 
     // =========================================================================
-    // ACT 3 & ACT 4 SHARED SURFACE: LANDING WITH FIRE/STORM -> CREW EXIT & FLAG
+    // ACT 3 & ACT 4 SHARED SURFACE: LANDING -> AIRLOCK OPEN -> RAMP -> FLAG
     // =========================================================================
     const surfaceGroup = new THREE.Group();
     scene.add(surfaceGroup);
@@ -772,40 +795,8 @@ export default function MissionLaunchScene({
     const landingFlame = createFlameAssembly();
     landingFlame.group.position.set(0, 0.35, 0);
     shipLanding.add(landingFlame.group);
-
-    // Extensible Airlock Hatch Glow + Disembarkation Boarding Ramp attached to landed ship
-    const exitHatchGlowMat = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0,
-    });
-    const exitHatchGlow = new THREE.Mesh(new THREE.PlaneGeometry(0.64, 0.98), exitHatchGlowMat);
-    exitHatchGlow.position.set(0, 2.58, 1.42);
-    shipLanding.add(exitHatchGlow);
-
-    const exitRampGroup = new THREE.Group();
-    exitRampGroup.position.set(0, 2.02, 1.38);
-    const exitRampMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(1.15, 0.1, 3.35),
-      rampMat
-    );
-    exitRampMesh.position.set(0, 0, 1.68);
-    exitRampMesh.castShadow = true;
-    exitRampMesh.receiveShadow = true;
-    exitRampGroup.add(exitRampMesh);
-    const exitRailMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    for (const rx of [-0.54, 0.54]) {
-      const er = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 3.2), exitRailMat);
-      er.position.set(rx, 0.09, 1.65);
-      exitRampGroup.add(er);
-    }
-    exitRampGroup.rotation.x = 0.64; // Slopes down toward ground z ~ +3.7
-    exitRampGroup.visible = false;
-    shipLanding.add(exitRampGroup);
-
     surfaceGroup.add(shipLanding);
 
-    // Storm Particle System
     const stormColor = getStormColorHex(planetId);
 
     const blastCount = 260;
@@ -832,10 +823,8 @@ export default function MissionLaunchScene({
       opacity: 0,
       depthWrite: false,
     });
-    const blastParticles = new THREE.Points(blastGeo, blastMat);
-    surfaceGroup.add(blastParticles);
+    surfaceGroup.add(new THREE.Points(blastGeo, blastMat));
 
-    // Engine Fire Particle Plume & Ember Splash System
     const fireTex = createFireSpriteTexture();
     disposables.push(fireTex);
     const fireParticleCount = 220;
@@ -843,9 +832,9 @@ export default function MissionLaunchScene({
     const engineFireColors = new Float32Array(fireParticleCount * 3);
     const engineFireSeeds = new Float32Array(fireParticleCount * 3);
     for (let i = 0; i < fireParticleCount; i++) {
-      engineFireSeeds[i * 3] = ((i * 73) % 100) / 100; // phase offset
-      engineFireSeeds[i * 3 + 1] = ((i * 137.5) % 360) * (Math.PI / 180); // radial angle
-      engineFireSeeds[i * 3 + 2] = 0.35 + ((i * 29) % 100) / 140; // radial spread factor
+      engineFireSeeds[i * 3] = ((i * 73) % 100) / 100;
+      engineFireSeeds[i * 3 + 1] = ((i * 137.5) % 360) * (Math.PI / 180);
+      engineFireSeeds[i * 3 + 2] = 0.35 + ((i * 29) % 100) / 140;
     }
     const engineFireGeo = new THREE.BufferGeometry();
     engineFireGeo.setAttribute('position', new THREE.BufferAttribute(engineFirePos, 3));
@@ -879,8 +868,7 @@ export default function MissionLaunchScene({
       opacity: 0,
       depthWrite: false,
     });
-    const windParticles = new THREE.Points(windGeo, windMat);
-    surfaceGroup.add(windParticles);
+    surfaceGroup.add(new THREE.Points(windGeo, windMat));
 
     const dustRingMat1 = new THREE.MeshBasicMaterial({
       color: stormColor,
@@ -907,16 +895,27 @@ export default function MissionLaunchScene({
     surfaceGroup.add(dustRing2);
 
     // =========================================================================
-    // ACT 4: DISEMBARKING 6 ASTRONAUTS + COMMANDER FLAG PLANTING CEREMONY
+    // ACT 4: CREW DISEMBARKS DOWN RAMP AT FULL 1.0 SCALE + FLAG PLANTING
     // =========================================================================
     const disembarkGroup = new THREE.Group();
     surfaceGroup.add(disembarkGroup);
 
-    const FLAG_SPOT = { x: 2.35, z: 3.1 };
     const plantedFlag = createPlantedFlagMesh(shadowTex, maxAnisotropy);
-    plantedFlag.position.set(FLAG_SPOT.x, 0, FLAG_SPOT.z);
     plantedFlag.visible = false;
     disembarkGroup.add(plantedFlag);
+
+    // Preview marker for selected flag site prior to Commander planting
+    const flagTargetRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.32, 0.52, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0x10b981,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.72,
+      })
+    );
+    flagTargetRing.rotation.x = -Math.PI / 2;
+    disembarkGroup.add(flagTargetRing);
 
     const flagImpactRingMat = new THREE.MeshBasicMaterial({
       color: stormColor,
@@ -930,20 +929,17 @@ export default function MissionLaunchScene({
       flagImpactRingMat
     );
     flagImpactRing.rotation.x = -Math.PI / 2;
-    flagImpactRing.position.set(FLAG_SPOT.x, 0.05, FLAG_SPOT.z);
     disembarkGroup.add(flagImpactRing);
 
-    // Surface semi-circle formation spots facing camera after descending ship ramp
     const FORMATION_TARGETS: Array<{ x: number; z: number; yaw: number }> = [
-      { x: 1.65, z: 3.25, yaw: 0.55 }, // Commander Abubakr next to planted flag!
-      { x: -1.8, z: 4.5, yaw: 0.2 }, // Affan
-      { x: 3.6, z: 4.3, yaw: -0.35 }, // Ali
-      { x: -3.2, z: 3.6, yaw: 0.4 }, // Jawwad
-      { x: 4.8, z: 3.1, yaw: -0.5 }, // Om
-      { x: 0.1, z: 4.9, yaw: 0.08 }, // Ammar
+      { x: 1.65, z: 3.25, yaw: 0.55 },
+      { x: -1.8, z: 4.5, yaw: 0.2 },
+      { x: 3.6, z: 4.3, yaw: -0.35 },
+      { x: -3.2, z: 3.6, yaw: 0.4 },
+      { x: 4.8, z: 3.1, yaw: -0.5 },
+      { x: 0.1, z: 4.9, yaw: 0.08 },
     ];
 
-    // Held flagpole carried in Commander Abubakr's right hand before planting
     const heldFlagPole = new THREE.Group();
     const poleRod = new THREE.Mesh(
       new THREE.CylinderGeometry(0.032, 0.036, 2.1, 10),
@@ -956,6 +952,7 @@ export default function MissionLaunchScene({
     const disembarkCrew = ASTRONAUTS.map((profile, idx) => {
       const mesh = createAstronautMesh(profile, shadowTex, false);
       mesh.visible = false;
+      mesh.scale.setScalar(1);
       disembarkGroup.add(mesh);
       if (idx === 0 && mesh.userData.animRefs?.rightArm) {
         mesh.userData.animRefs.rightArm.add(heldFlagPole);
@@ -967,9 +964,7 @@ export default function MissionLaunchScene({
       };
     });
 
-    // =========================================================================
-    // PROCEDURAL WEB AUDIO FOR LAUNCH RUMBLE & STORM WIND (MUTABLE)
-    // =========================================================================
+    // Procedural audio
     let audioCtx: AudioContext | null = null;
     let thrusterGain: GainNode | null = null;
     let windGain: GainNode | null = null;
@@ -986,9 +981,7 @@ export default function MissionLaunchScene({
           const bufLen = audioCtx.sampleRate * 2;
           const noiseBuf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
           const ch = noiseBuf.getChannelData(0);
-          for (let i = 0; i < bufLen; i++) {
-            ch[i] = Math.random() * 2 - 1;
-          }
+          for (let i = 0; i < bufLen; i++) ch[i] = Math.random() * 2 - 1;
           noiseSrc = audioCtx.createBufferSource();
           noiseSrc.buffer = noiseBuf;
           noiseSrc.loop = true;
@@ -996,7 +989,6 @@ export default function MissionLaunchScene({
           const lowFilter = audioCtx.createBiquadFilter();
           lowFilter.type = 'lowpass';
           lowFilter.frequency.value = 180;
-
           thrusterGain = audioCtx.createGain();
           thrusterGain.gain.value = 0.0001;
 
@@ -1004,7 +996,6 @@ export default function MissionLaunchScene({
           bandFilter.type = 'bandpass';
           bandFilter.frequency.value = 340;
           bandFilter.Q.value = 0.9;
-
           windGain = audioCtx.createGain();
           windGain.gain.value = 0.0001;
 
@@ -1018,28 +1009,22 @@ export default function MissionLaunchScene({
           noiseSrc.connect(lowFilter);
           lowFilter.connect(thrusterGain);
           thrusterGain.connect(audioCtx.destination);
-
           noiseSrc.connect(bandFilter);
           bandFilter.connect(windGain);
           windGain.connect(audioCtx.destination);
-
           bassOsc.connect(bassLow);
           bassLow.connect(thrusterGain);
 
           noiseSrc.start();
           bassOsc.start();
-          if (audioCtx.state === 'suspended') {
-            audioCtx.resume().catch(() => {});
-          }
+          if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
         }
       } catch {
         audioCtx = null;
       }
     }
 
-    if (!isSoftwareGl) {
-      renderer.compile(scene, camera);
-    }
+    if (!isSoftwareGl) renderer.compile(scene, camera);
 
     const handleResize = () => {
       const w = container.clientWidth || 960;
@@ -1055,6 +1040,7 @@ export default function MissionLaunchScene({
     let contextLost = false;
     let frameId = 0;
     let lastNow = performance.now();
+    let elapsed = 0;
     let seqTime = startStage === 'transit' ? BOARDING_DURATION : 0;
     let completed = false;
     let lastReportedStage: LaunchStageId = startStage;
@@ -1105,9 +1091,8 @@ export default function MissionLaunchScene({
               return;
             }
             const status = gl.getSyncParameter(sync, gl.SYNC_STATUS);
-            if (status === gl.UNSIGNALED) {
-              frameId = window.setTimeout(poll, 5);
-            } else {
+            if (status === gl.UNSIGNALED) frameId = window.setTimeout(poll, 5);
+            else {
               gl.deleteSync(sync);
               frameId = window.setTimeout(cb, 80);
             }
@@ -1121,11 +1106,8 @@ export default function MissionLaunchScene({
 
     const scheduleNextTick = () => {
       if (disposed || contextLost) return;
-      if (isSoftwareGl) {
-        afterDraw(tick);
-      } else {
-        frameId = requestAnimationFrame(tick);
-      }
+      if (isSoftwareGl) afterDraw(tick);
+      else frameId = requestAnimationFrame(tick);
     };
 
     const tick = () => {
@@ -1133,6 +1115,7 @@ export default function MissionLaunchScene({
       const now = performance.now();
       const dt = Math.min(0.08, (now - lastNow) / 1000);
       lastNow = now;
+      elapsed += dt;
 
       seqTime = Math.min(TOTAL_DURATION + 0.85, seqTime + dt);
 
@@ -1178,35 +1161,53 @@ export default function MissionLaunchScene({
         hemiLight.groundColor.setHex(0x1e293b);
         hemiLight.intensity = 0.9;
 
+        // Open airlock & ramp during boarding (t=0..3.6), close & stow cleanly (3.6..4.4), then ignition liftoff (4.4..5.4)!
+        const doorOpen = t < 3.6 ? Math.min(1, t / 0.5) : Math.max(0, 1 - (t - 3.6) / 0.6);
+        const rampOpen = t < 3.8 ? 1 : Math.max(0, 1 - (t - 3.8) / 0.55);
+        setShipAirlockAndRamp(shipBoarding, doorOpen, rampOpen);
+
+        const liftoffP = THREE.MathUtils.clamp((t - 4.35) / (BOARDING_DURATION - 4.35), 0, 1);
+        const shipAlt = Math.pow(liftoffP, 2.1) * 7.5;
+        shipBoarding.position.set(0, shipAlt, 0);
+        shipBoarding.rotation.set(0, 0, 0);
+        liftoffFlame.group.visible = liftoffP > 0.02;
+        if (liftoffP > 0.02) {
+          const fl = 0.9 + Math.sin(t * 40) * 0.14;
+          liftoffFlame.coreCone.scale.set(1, fl * 1.2, 1);
+          liftoffFlame.outerCone.scale.set(1.1, fl * 1.4, 1.1);
+          liftoffFlame.light.intensity = 6.5 * fl;
+          targetThrustAudio = 0.055;
+        }
+
         let boarded = 0;
         boardingCrew.forEach((member, idx) => {
-          const walkDelay = idx * 0.34;
-          const walkSpan = 2.35;
+          const walkDelay = idx * 0.32;
+          const walkSpan = 2.1;
           const localP = THREE.MathUtils.clamp((t - walkDelay) / walkSpan, 0, 1);
 
-          const zPos = THREE.MathUtils.lerp(member.startZ, 1.28, localP);
-          const climbBlend = THREE.MathUtils.smoothstep(3.15 - zPos, 0, 1.85);
-          const yPos = 0.16 + climbBlend * 1.65;
-          const xPos = THREE.MathUtils.lerp(member.laneX, 0, climbBlend);
+          // Walk smoothly from startZ -> bottom of ramp (4.1) -> top of ramp inside airlock alcove (1.26)
+          const zPos = THREE.MathUtils.lerp(member.startZ, 1.24, localP);
+          const rampBlend = THREE.MathUtils.smoothstep(4.2 - zPos, 0, 2.9);
+          const yPos = 0.16 + rampBlend * 1.82;
+          const xPos = THREE.MathUtils.lerp(member.laneX, 0, rampBlend);
 
-          const enterFade =
-            zPos < 1.72 ? THREE.MathUtils.clamp((zPos - 1.28) / 0.44, 0.04, 1) : 1;
-          member.mesh.visible = localP < 0.99;
+          // Stay strictly full 1.0 scale until stepping cleanly inside doorway
+          member.mesh.scale.setScalar(1);
+          member.mesh.visible = localP < 0.985;
           member.mesh.position.set(xPos, yPos, zPos);
-          member.mesh.scale.setScalar(enterFade);
 
           const walkCycle = t * 9.5 + idx * 1.1;
-          const swing = Math.sin(walkCycle) * 0.58;
+          const swing = Math.sin(walkCycle) * 0.55;
           const refs = member.mesh.userData.animRefs;
           if (refs) {
             refs.leftLeg.rotation.x = swing;
             refs.rightLeg.rotation.x = -swing;
-            refs.leftArm.rotation.x = -swing * 0.8;
-            refs.rightArm.rotation.x = swing * 0.8;
+            refs.leftArm.rotation.x = -swing * 0.75;
+            refs.rightArm.rotation.x = swing * 0.75;
             refs.selectionRing.visible = false;
           }
 
-          if (localP >= 0.94) boarded += 1;
+          if (localP >= 0.96) boarded += 1;
         });
 
         if (boarded !== lastReportedBoarded) {
@@ -1218,22 +1219,17 @@ export default function MissionLaunchScene({
         if (shipRefs) {
           shipRefs.beaconMat.emissiveIntensity = 0.9 + 0.7 * Math.sin(t * 4);
         }
-        airlockGlowMat.opacity = 0.65 + 0.3 * Math.sin(t * 7);
         if (lastReportedStorm !== 0) {
           lastReportedStorm = 0;
           setStormOverlayLevel(0);
         }
 
         _camPos.set(
-          THREE.MathUtils.lerp(5.8, 4.2, tNorm),
-          THREE.MathUtils.lerp(2.4, 3.3, tNorm),
-          THREE.MathUtils.lerp(9.6, 7.2, tNorm)
+          THREE.MathUtils.lerp(5.8, 7.6, tNorm),
+          THREE.MathUtils.lerp(2.4, 4.2 + shipAlt * 0.4, tNorm),
+          THREE.MathUtils.lerp(10.2, 11.4, tNorm)
         );
-        _camLook.set(
-          0,
-          THREE.MathUtils.lerp(1.3, 2.5, tNorm),
-          THREE.MathUtils.lerp(3.2, 0.5, tNorm)
-        );
+        _camLook.set(0, 1.5 + shipAlt * 0.85, THREE.MathUtils.lerp(3.2, 0.2, tNorm));
         camera.position.copy(_camPos);
         camera.lookAt(_camLook);
       } else if (curStage === 'transit') {
@@ -1276,8 +1272,14 @@ export default function MissionLaunchScene({
         _shipDir.subVectors(_shipNext, _shipPos);
         if (_shipDir.lengthSq() > 0.00001) {
           _shipDir.normalize();
-          _quat.setFromUnitVectors(_upVec, _shipDir);
-          shipTransit.quaternion.copy(_quat);
+          // Orthonormal basis keeps ship nose pointing along _shipDir without random roll twist
+          _fwdAxis.set(0, 0, 1);
+          _sideAxis.crossVectors(_shipDir, _fwdAxis);
+          if (_sideAxis.lengthSq() < 0.0001) _sideAxis.set(1, 0, 0);
+          _sideAxis.normalize();
+          _fwdAxis.crossVectors(_sideAxis, _shipDir).normalize();
+          _basisMat.makeBasis(_sideAxis, _shipDir, _fwdAxis);
+          shipTransit.quaternion.setFromRotationMatrix(_basisMat);
         }
         shipTransit.position.copy(_shipPos);
 
@@ -1334,18 +1336,25 @@ export default function MissionLaunchScene({
 
         const inv = 1 - p;
         const afterTouch = Math.max(0, localT - descentDuration);
+        // Gravity-scaled landing suspension settle
+        const gravScale = planet.gravityMs2 / 3.71;
         const settleBounce =
           p >= 1
-            ? Math.max(0, Math.exp(-afterTouch * 5.2) * Math.sin(afterTouch * 16) * 0.085)
+            ? Math.max(
+                0,
+                Math.exp(-afterTouch * (3.8 + gravScale * 1.5)) *
+                  Math.sin(afterTouch * (12 + gravScale * 4)) *
+                  0.09
+              )
             : 0;
         const alt = 28 * Math.pow(inv, 2.2) + settleBounce;
-        const lateralDrift = Math.sin(p * Math.PI) * 1.15 * inv;
-        const tilt = inv * 0.16;
+        const lateralDrift = Math.sin(p * Math.PI) * 1.05 * inv;
+        const tilt = inv * 0.11;
 
         shipLanding.position.set(lateralDrift, alt, 0);
-        shipLanding.rotation.set(tilt * 0.4, -0.35, -tilt);
-        exitRampGroup.visible = false;
-        exitHatchGlowMat.opacity = 0;
+        // Keep ship rotation order YXZ locked to LANDED_SHIP_YAW so zero 90-degree snap occurs!
+        shipLanding.rotation.set(tilt * 0.35, LANDED_SHIP_YAW, -tilt * 0.35);
+        setShipAirlockAndRamp(shipLanding, 0, 0);
 
         const fireFade = p < 1 ? 1 : Math.max(0, 1 - afterTouch / 0.95);
         const flicker = 0.85 + Math.sin(localT * 42) * 0.16 + Math.cos(localT * 29) * 0.1;
@@ -1364,7 +1373,6 @@ export default function MissionLaunchScene({
         landingFlame.outerMat.opacity = 0.62 * fireFade;
         landingFlame.light.intensity = 8.2 * flicker * fireFade;
 
-        // Animate 220 Engine Fire Plume & Ground-Splash Ember Particles
         engineFireParticles.visible = fireFade > 0.02;
         engineFireMat.opacity = 0.92 * fireFade;
         if (fireFade > 0.02) {
@@ -1380,8 +1388,6 @@ export default function MissionLaunchScene({
             let py = nozzleY - dropDist;
             let radial = (0.14 + phase * 0.88) * spread;
             let heat = 1 - phase;
-
-            // Splash radially outward into bright embers on surface contact
             if (py < 0.14) {
               const impactDepth = Math.min(3.5, 0.14 - py);
               py = 0.1 + impactDepth * 0.26 * spread;
@@ -1395,7 +1401,6 @@ export default function MissionLaunchScene({
             engineFirePos[i * 3 + 2] =
               Math.sin(angle) * radial + Math.cos(localT * 16 + i) * 0.05;
 
-            // Color ramp: hot white-yellow core -> fiery orange -> crimson ember
             engineFireColors[i * 3] = 0.82 + heat * 0.18;
             engineFireColors[i * 3 + 1] = 0.16 + heat * heat * 0.78;
             engineFireColors[i * 3 + 2] = heat > 0.65 ? (heat - 0.65) * 2.0 : 0.03;
@@ -1502,7 +1507,7 @@ export default function MissionLaunchScene({
           setTouchdownReady(true);
         }
       } else {
-        // ACT 4: CREW DISEMBARKS DOWN RAMP & COMMANDER PLANTS PAKISTAN FLAG
+        // ACT 4: SLIDING DOORS OPEN -> HINGED RAMP UNFOLDS -> FULL-SCALE CREW DISEMBARKS -> FLAG PLANTED
         const localT = seqTime - (BOARDING_DURATION + TRANSIT_DURATION + LANDING_DURATION);
 
         if (lastReportedStorm !== 0) {
@@ -1510,7 +1515,7 @@ export default function MissionLaunchScene({
           setStormOverlayLevel(0);
         }
         shipLanding.position.set(0, 0, 0);
-        shipLanding.rotation.set(0, -0.35, 0);
+        shipLanding.rotation.set(0, LANDED_SHIP_YAW, 0);
         landingFlame.group.visible = false;
         engineFireParticles.visible = false;
         engineFireMat.opacity = 0;
@@ -1530,13 +1535,10 @@ export default function MissionLaunchScene({
         hemiLight.groundColor.setHex(planetSpec.hemiGroundColor);
         hemiLight.intensity = planetSpec.hemiIntensity;
 
-        // Open airlock & deploy boarding ramp smoothly in first 1.0s
-        const rampP = THREE.MathUtils.clamp(localT / 0.9, 0, 1);
-        exitRampGroup.visible = rampP > 0.05;
-        exitRampGroup.scale.set(1, 1, Math.max(0.05, rampP));
-        exitHatchGlowMat.opacity = rampP * (0.75 + 0.2 * Math.sin(localT * 6));
+        const doorOpen = THREE.MathUtils.clamp(localT / 0.65, 0, 1);
+        const rampDeploy = THREE.MathUtils.clamp((localT - 0.15) / 0.85, 0, 1);
+        setShipAirlockAndRamp(shipLanding, doorOpen, rampDeploy);
 
-        // Subtle calming breeze particles
         windMat.opacity = 0.22;
         const wAttr = windGeo.attributes.position as THREE.BufferAttribute;
         for (let i = 0; i < windCount; i++) {
@@ -1549,24 +1551,36 @@ export default function MissionLaunchScene({
         }
         wAttr.needsUpdate = true;
 
-        // Compute ship airlock world ramp path (ship rotated -0.35 rad around Y)
-        const shipYaw = -0.35;
+        const shipYaw = LANDED_SHIP_YAW;
         const sinY = Math.sin(shipYaw);
         const cosY = Math.cos(shipYaw);
         const shipToWorldX = (lx: number, lz: number) => lx * cosY + lz * sinY;
         const shipToWorldZ = (lx: number, lz: number) => -lx * sinY + lz * cosY;
 
-        const rampTopX = shipToWorldX(0, 1.45);
-        const rampTopZ = shipToWorldZ(0, 1.45);
+        const rampTopX = shipToWorldX(0, 1.38);
+        const rampTopZ = shipToWorldZ(0, 1.38);
         const rampBotX = shipToWorldX(0, 4.4);
         const rampBotZ = shipToWorldZ(0, 4.4);
 
+        const activePreset = selectedFlagRef.current;
+        flagTargetRing.position.set(
+          activePreset.localX,
+          groundHeightAt(planetId, activePreset.localX, activePreset.localZ) + 0.05,
+          activePreset.localZ
+        );
+        flagImpactRing.position.set(
+          activePreset.localX,
+          groundHeightAt(planetId, activePreset.localX, activePreset.localZ) + 0.06,
+          activePreset.localZ
+        );
+
         let exited = 0;
-        const flagPlantTime = 5.4;
+        const flagPlantTime = 5.6;
         const isFlagLocked = localT >= flagPlantTime;
+        flagTargetRing.visible = !isFlagLocked;
 
         disembarkCrew.forEach((member, idx) => {
-          const delay = idx === 0 ? 0.55 : 1.15 + idx * 0.55;
+          const delay = idx === 0 ? 0.75 : 1.3 + idx * 0.52;
           const rampDur = 1.65;
           const groundDur = idx === 0 ? 1.85 : 1.5;
 
@@ -1577,16 +1591,20 @@ export default function MissionLaunchScene({
           }
 
           member.mesh.visible = true;
+          // NEVER shrink or pop astronaut scale!
+          member.mesh.scale.setScalar(1);
           const refs = member.mesh.userData.animRefs;
 
+          // Commander Abubakr walks directly near selected flag site
+          const destX = idx === 0 ? activePreset.localX - 0.68 : member.target.x;
+          const destZ = idx === 0 ? activePreset.localZ + 0.16 : member.target.z;
+
           if (tSinceStart < rampDur) {
-            // Descending ramp from airlock down to planetary surface
             const rp = tSinceStart / rampDur;
             const wx = THREE.MathUtils.lerp(rampTopX, rampBotX, rp);
             const wz = THREE.MathUtils.lerp(rampTopZ, rampBotZ, rp);
-            const wy = THREE.MathUtils.lerp(1.92, 0.0, rp);
+            const wy = THREE.MathUtils.lerp(1.94, groundHeightAt(planetId, rampBotX, rampBotZ), rp);
             member.mesh.position.set(wx, wy, wz);
-            member.mesh.scale.setScalar(THREE.MathUtils.clamp(rp * 3.5, 0.15, 1));
             member.mesh.rotation.y = shipYaw;
 
             if (refs) {
@@ -1601,15 +1619,13 @@ export default function MissionLaunchScene({
             exited += 1;
             const gp = THREE.MathUtils.clamp((tSinceStart - rampDur) / groundDur, 0, 1);
             const easeG = gp * gp * (3 - 2 * gp);
-            const wx = THREE.MathUtils.lerp(rampBotX, member.target.x, easeG);
-            const wz = THREE.MathUtils.lerp(rampBotZ, member.target.z, easeG);
-            member.mesh.position.set(wx, 0, wz);
-            member.mesh.scale.setScalar(1);
+            const wx = THREE.MathUtils.lerp(rampBotX, destX, easeG);
+            const wz = THREE.MathUtils.lerp(rampBotZ, destZ, easeG);
+            const gy = groundHeightAt(planetId, wx, wz);
+            member.mesh.position.set(wx, gy, wz);
 
             if (gp < 1) {
-              const dx = member.target.x - rampBotX;
-              const dz = member.target.z - rampBotZ;
-              member.mesh.rotation.y = Math.atan2(dx, dz);
+              member.mesh.rotation.y = Math.atan2(destX - rampBotX, destZ - rampBotZ);
               if (refs) {
                 const swing = Math.sin(localT * 10 + idx) * 0.55;
                 refs.leftLeg.rotation.x = swing;
@@ -1618,19 +1634,21 @@ export default function MissionLaunchScene({
                 refs.rightArm.rotation.x = idx === 0 ? -0.65 : swing * 0.75;
               }
             } else {
-              member.mesh.rotation.y = member.target.yaw;
+              const targetYaw =
+                idx === 0
+                  ? Math.atan2(activePreset.localX - destX, activePreset.localZ - destZ)
+                  : member.target.yaw;
+              member.mesh.rotation.y = targetYaw;
               if (refs) {
                 refs.leftLeg.rotation.x = 0;
                 refs.rightLeg.rotation.x = 0;
                 if (idx === 0) {
-                  // Commander Abubakr flag-planting motion!
                   if (localT < flagPlantTime) {
                     const plantP = THREE.MathUtils.clamp(
                       (localT - (delay + rampDur + groundDur)) / 1.35,
                       0,
                       1
                     );
-                    // Raise and plunge flag down cleanly
                     const liftAngle =
                       plantP < 0.55
                         ? THREE.MathUtils.lerp(-0.65, -2.15, plantP / 0.55)
@@ -1638,9 +1656,8 @@ export default function MissionLaunchScene({
                     refs.rightArm.rotation.x = liftAngle;
                     refs.leftArm.rotation.x = liftAngle * 0.75;
                   } else {
-                    // Commander salute / proud stance facing camera
                     const postP = THREE.MathUtils.clamp((localT - flagPlantTime) / 0.8, 0, 1);
-                    member.mesh.rotation.y = THREE.MathUtils.lerp(member.target.yaw, 0.15, postP);
+                    member.mesh.rotation.y = THREE.MathUtils.lerp(targetYaw, 0.15, postP);
                     refs.rightArm.rotation.x = THREE.MathUtils.lerp(-0.55, -2.05, postP);
                     refs.rightArm.rotation.z = THREE.MathUtils.lerp(0, -0.35, postP);
                     refs.leftArm.rotation.x = THREE.MathUtils.lerp(-0.4, 0.08, postP);
@@ -1660,7 +1677,8 @@ export default function MissionLaunchScene({
         if (isFlagLocked) {
           const sincePlant = localT - flagPlantTime;
           const dropDrop = Math.max(0, 1 - sincePlant / 0.28);
-          plantedFlag.position.set(FLAG_SPOT.x, dropDrop * 0.45, FLAG_SPOT.z);
+          const fy = groundHeightAt(planetId, activePreset.localX, activePreset.localZ);
+          plantedFlag.position.set(activePreset.localX, fy + dropDrop * 0.42, activePreset.localZ);
 
           if (plantedFlag.userData.plantedFlagRefs?.flagPivot) {
             plantedFlag.userData.plantedFlagRefs.flagPivot.rotation.y =
@@ -1687,11 +1705,11 @@ export default function MissionLaunchScene({
         _camPos.set(
           THREE.MathUtils.lerp(6.8, 3.2, camEase),
           THREE.MathUtils.lerp(3.2, 2.35, camEase),
-          THREE.MathUtils.lerp(9.6, 8.8, camEase)
+          THREE.MathUtils.lerp(9.8, 9.2, camEase)
         );
         _camLook.set(
-          THREE.MathUtils.lerp(0.6, 1.5, camEase),
-          THREE.MathUtils.lerp(1.6, 1.4, camEase),
+          THREE.MathUtils.lerp(0.6, activePreset.localX * 0.5, camEase),
+          THREE.MathUtils.lerp(1.6, 1.35, camEase),
           THREE.MathUtils.lerp(1.5, 3.0, camEase)
         );
         camera.position.copy(_camPos);
@@ -1699,6 +1717,8 @@ export default function MissionLaunchScene({
 
         targetWindAudio = 0.016;
       }
+
+      terrainBundle.updateSkyEffects(elapsed, dt);
 
       if (audioCtx && thrusterGain && windGain && !mutedRef.current) {
         const ct = audioCtx.currentTime;
@@ -1715,7 +1735,12 @@ export default function MissionLaunchScene({
       if (seqTime >= TOTAL_DURATION + 0.65 && !completed) {
         completed = true;
         stopNasaSpeech();
-        onCompleteRef.current();
+        const chosen = selectedFlagRef.current;
+        onCompleteRef.current({
+          siteLabel: chosen.siteLabel,
+          outpostX: chosen.outpostX,
+          outpostZ: chosen.outpostZ,
+        });
         return;
       }
 
@@ -1736,9 +1761,7 @@ export default function MissionLaunchScene({
         try {
           noiseSrc?.stop();
           bassOsc?.stop();
-          if (audioCtx.state !== 'closed') {
-            audioCtx.close().catch(() => {});
-          }
+          if (audioCtx.state !== 'closed') audioCtx.close().catch(() => {});
         } catch {
           // Ignore audio cleanup errors
         }
@@ -1770,36 +1793,33 @@ export default function MissionLaunchScene({
 
   const stageLabel =
     stage === 'boarding'
-      ? 'Phase 01 · Crew Boarding NASA Starship'
+      ? 'Phase 01 · Crew Boarding & Liftoff'
       : stage === 'transit'
       ? `Phase 02 · Earth → ${planet.name} Interplanetary Burn`
       : stage === 'landing'
       ? touchdownReady
-        ? `Touchdown Confirmed · ${planet.name} Storm Clearing`
-        : `Phase 03 · Retro-Fire Descent & ${planet.name} Storm Landing`
+        ? `Touchdown Confirmed · ${planet.name} Dust Clearing`
+        : `Phase 03 · Retro-Fire Descent & ${planet.name} Landing`
       : flagPlanted
-      ? `Phase 04 · Pakistan Flag Planted on ${planet.name}`
-      : `Phase 04 · Crew Exiting Ship & Flag Ceremony`;
+      ? `Phase 04 · Pakistan Flag Planted at ${selectedFlagPreset.siteLabel}`
+      : `Phase 04 · Crew Disembarking Down Ramp`;
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-[#05070C] text-slate-100 select-none">
       <div ref={mountRef} className="w-full h-full" />
 
-      {/* Subtle Atmospheric Storm Overlay During Ship Descent (Pointer-Events-None, Zero Backdrop-Blur) */}
       {stage === 'landing' && stormOverlayLevel > 0.02 && (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-10 overflow-hidden transition-opacity duration-200"
           style={{ opacity: Math.min(0.88, stormOverlayLevel * 0.85) }}
         >
-          {/* Radial Storm Haze Edge Vignette */}
           <div
             className="absolute inset-0"
             style={{
               background: `radial-gradient(ellipse at 50% 48%, transparent 46%, ${stormOverlayStyle.haze} 100%)`,
             }}
           />
-          {/* Subtle Wind-Shear Diagonal Streaks */}
           <div
             className="absolute inset-0 opacity-60"
             style={{
@@ -1809,7 +1829,6 @@ export default function MissionLaunchScene({
         </div>
       )}
 
-      {/* Top Sequence Header */}
       <header className="absolute top-0 inset-x-0 z-20 bg-[#0F1623]/92 border-b border-slate-800 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-[11px] font-mono uppercase tracking-wider text-sky-400 flex items-center gap-2">
@@ -1827,7 +1846,6 @@ export default function MissionLaunchScene({
               type="button"
               onClick={onToggleAudio}
               className="px-3 py-2 rounded-lg bg-[#07090E] border border-slate-700 hover:border-sky-500/60 text-slate-200 font-mono text-xs flex items-center gap-1.5 transition-colors whitespace-nowrap"
-              title={isAudioMuted ? 'Unmute NASA Capcom & Audio' : 'Mute Audio'}
             >
               {isAudioMuted ? (
                 <VolumeX className="w-4 h-4 text-rose-400" />
@@ -1841,7 +1859,11 @@ export default function MissionLaunchScene({
             type="button"
             onClick={() => {
               stopNasaSpeech();
-              onComplete();
+              onComplete({
+                siteLabel: selectedFlagPreset.siteLabel,
+                outpostX: selectedFlagPreset.outpostX,
+                outpostZ: selectedFlagPreset.outpostZ,
+              });
             }}
             className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-display font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
           >
@@ -1851,7 +1873,39 @@ export default function MissionLaunchScene({
         </div>
       </header>
 
-      {/* Compact Capcom Briefing Card during Transit */}
+      {/* Flag Site Selector Panel during Transit/Landing/Disembark */}
+      <div className="absolute top-20 right-4 z-20 w-[min(270px,90vw)] rounded-xl bg-[#0F1623]/94 border border-emerald-500/40 p-3 shadow-xl">
+        <div className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider text-emerald-400 mb-2">
+          <MapPin className="w-3.5 h-3.5" />
+          Flag Planting Location
+        </div>
+        <div className="space-y-1.5">
+          {FLAG_SITE_PRESETS.map((preset) => {
+            const active = selectedFlagId === preset.id;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                disabled={flagPlanted}
+                onClick={() => setSelectedFlagId(preset.id)}
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-colors ${
+                  active
+                    ? 'bg-emerald-500/20 border-emerald-400 text-white font-semibold'
+                    : 'bg-[#07090E] border-slate-800 text-slate-300 hover:border-slate-600'
+                } ${flagPlanted ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                {preset.siteLabel}
+              </button>
+            );
+          })}
+        </div>
+        <div className="text-[10px] font-mono text-slate-400 mt-2">
+          {flagPlanted
+            ? 'Flag permanently anchored on outpost terrain.'
+            : 'Selected site remains permanently visible after landing.'}
+        </div>
+      </div>
+
       {stage === 'transit' && (
         <aside className="absolute top-20 left-4 z-20 w-[min(390px,92vw)] rounded-xl bg-[#0F1623]/94 border border-sky-500/40 p-3.5 shadow-xl">
           <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-800">
@@ -1871,11 +1925,8 @@ export default function MissionLaunchScene({
             <button
               type="button"
               onClick={() => {
-                if (isAudioMuted && onToggleAudio) {
-                  onToggleAudio();
-                } else {
-                  speakBriefing(briefing.spokenScript, false);
-                }
+                if (isAudioMuted && onToggleAudio) onToggleAudio();
+                else speakBriefing(briefing.spokenScript, false);
               }}
               className="px-2.5 py-1 rounded-md bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/50 text-sky-200 font-mono text-[11px] flex items-center gap-1 shrink-0 transition-colors"
             >
@@ -1894,17 +1945,13 @@ export default function MissionLaunchScene({
                 <div className="font-mono text-amber-200 font-semibold">{briefing.etaLabel}</div>
               </div>
             </div>
-
             <div className="flex items-start gap-2 rounded-lg bg-[#07090E]/90 border border-slate-800 px-2.5 py-1.5">
               <CloudLightning className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
               <div className="min-w-0">
-                <div className="text-[10px] font-mono uppercase text-slate-400">
-                  Weather Telemetry
-                </div>
+                <div className="text-[10px] font-mono uppercase text-slate-400">Weather Telemetry</div>
                 <div className="text-slate-200 leading-snug">{briefing.weatherLabel}</div>
               </div>
             </div>
-
             <div className="flex items-start gap-2 rounded-lg bg-[#07090E]/90 border border-emerald-500/30 px-2.5 py-1.5">
               <ShieldAlert className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
               <div className="min-w-0">
@@ -1918,7 +1965,6 @@ export default function MissionLaunchScene({
         </aside>
       )}
 
-      {/* Bottom Cinematic Sequence Bar */}
       <footer className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[min(940px,95vw)] rounded-xl bg-[#0F1623]/94 border border-slate-800 px-4 py-3 flex flex-col gap-2.5">
         <div className="w-full h-1.5 rounded-full bg-[#07090E] border border-slate-800 overflow-hidden">
           <div
@@ -1962,32 +2008,29 @@ export default function MissionLaunchScene({
                 Boarded: {boardedCount}/{ASTRONAUTS.length} Astronauts
               </span>
             )}
-
             {stage === 'transit' && (
               <span className="text-amber-300 flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5 text-amber-400" />
                 {briefing.etaLabel} · {transitRemainingSec}s
               </span>
             )}
-
             {stage === 'landing' && (
               <span className="text-emerald-300 flex items-center gap-1.5">
                 <Wind className="w-3.5 h-3.5 text-amber-400" />
                 {touchdownReady ? 'Touchdown Confirmed' : `Storm Descent · ${planet.name}`}
               </span>
             )}
-
             {stage === 'disembark' && (
               <span className="text-emerald-300 flex items-center gap-1.5">
                 {flagPlanted ? (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    Commander Abubakr Planted Flag · {disembarkedCount}/{ASTRONAUTS.length} Out
+                    Flag Anchored · {disembarkedCount}/{ASTRONAUTS.length} Out
                   </>
                 ) : (
                   <>
                     <Flag className="w-3.5 h-3.5 text-amber-400" />
-                    Crew Exiting Ship ({disembarkedCount}/{ASTRONAUTS.length})
+                    Crew Exiting Ramp ({disembarkedCount}/{ASTRONAUTS.length})
                   </>
                 )}
               </span>

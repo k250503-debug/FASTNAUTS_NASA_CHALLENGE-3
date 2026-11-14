@@ -29,7 +29,6 @@ export function createSolarGridTexture(maxAnisotropy: number): THREE.CanvasTextu
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 512, 512);
 
-  // Fine photovoltaic wafer grid
   ctx.strokeStyle = 'rgba(125, 211, 252, 0.35)';
   ctx.lineWidth = 1.5;
   for (let i = 0; i <= 512; i += 32) {
@@ -37,14 +36,12 @@ export function createSolarGridTexture(maxAnisotropy: number): THREE.CanvasTextu
     ctx.moveTo(i, 0);
     ctx.lineTo(i, 512);
     ctx.stroke();
-
     ctx.beginPath();
     ctx.moveTo(0, i);
     ctx.lineTo(512, i);
     ctx.stroke();
   }
 
-  // Primary silver busbars
   ctx.strokeStyle = 'rgba(226, 232, 240, 0.65)';
   ctx.lineWidth = 3;
   for (let i = 0; i <= 512; i += 128) {
@@ -180,7 +177,6 @@ export function createAstronautMesh(
     obj.userData.astronautId = profile.id;
   };
 
-  // Active Selection Ring at feet
   const ringGeo = new THREE.RingGeometry(0.56, 0.74, 48);
   ringGeo.rotateX(-Math.PI / 2);
   const ringMat = new THREE.MeshBasicMaterial({
@@ -194,7 +190,6 @@ export function createAstronautMesh(
   selectionRing.visible = false;
   root.add(selectionRing);
 
-  // Articulated Sculpted Legs (hip pivot at y = 0.74)
   const makeLeg = (xOffset: number) => {
     const legPivot = new THREE.Group();
     legPivot.position.set(xOffset, 0.74, 0);
@@ -217,7 +212,6 @@ export function createAstronautMesh(
     tagPart(shin, 'boots');
     legPivot.add(shin);
 
-    // Sculpted Rounded EVA Boot + Sole
     const bootUpper = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.14, 8, 14), bootMat);
     bootUpper.rotation.x = Math.PI / 2;
     bootUpper.position.set(0, -0.64, 0.04);
@@ -237,7 +231,6 @@ export function createAstronautMesh(
   const leftLeg = makeLeg(-0.155);
   const rightLeg = makeLeg(0.155);
 
-  // Sculpted Pressurized Torso (smooth capsule + waist ring + shoulder yoke)
   const torsoCore = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.28, 12, 24), suitMat);
   torsoCore.scale.set(1.12, 1.0, 0.78);
   torsoCore.position.y = 1.03;
@@ -249,7 +242,7 @@ export function createAstronautMesh(
   waistRing.rotation.x = Math.PI / 2;
   waistRing.scale.set(1.12, 0.82, 1);
   waistRing.position.y = 0.79;
-  tagPart(waistTrimPlaceholder(waistRing), 'chest_pack');
+  tagPart(waistRing, 'chest_pack');
   root.add(waistRing);
 
   const accentBelt = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.032, 12, 28), trimMat);
@@ -259,7 +252,6 @@ export function createAstronautMesh(
   tagPart(accentBelt, 'chest_pack');
   root.add(accentBelt);
 
-  // Chest Telemetry Display Unit
   const chestFrame = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.14, 0.07, 18), jointMat);
   chestFrame.rotation.x = Math.PI / 2;
   chestFrame.position.set(0, 1.07, 0.185);
@@ -271,7 +263,6 @@ export function createAstronautMesh(
   tagPart(chestScreen, 'chest_pack');
   root.add(chestScreen);
 
-  // Sculpted PLSS Life Support Backpack (Twin O2 Tanks + Radiator Shroud + Beacon)
   const packShell = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.26, 10, 20), packMat);
   packShell.scale.set(1.18, 1.0, 0.62);
   packShell.position.set(0, 1.09, -0.25);
@@ -302,7 +293,6 @@ export function createAstronautMesh(
   tagPart(antenna, 'plss_backpack');
   root.add(antenna);
 
-  // Articulated Sculpted Arms (shoulder pivot at y = 1.28)
   const makeArm = (xOffset: number) => {
     const armPivot = new THREE.Group();
     armPivot.position.set(xOffset, 1.28, 0);
@@ -346,7 +336,6 @@ export function createAstronautMesh(
   const leftArm = makeArm(-0.34);
   const rightArm = makeArm(0.34);
 
-  // Neck-pivoted Sculpted Helmet + Domed Gold Reflective Visor + Dual LED Headlamps
   const headPivot = new THREE.Group();
   headPivot.position.set(0, 1.4, 0);
 
@@ -362,7 +351,6 @@ export function createAstronautMesh(
   tagPart(helmet, 'helmet');
   headPivot.add(helmet);
 
-  // Curved Panoramic Gold EVA Visor Shield
   const visorShield = new THREE.Mesh(
     new THREE.SphereGeometry(
       0.245,
@@ -379,7 +367,6 @@ export function createAstronautMesh(
   tagPart(visorShield, 'helmet');
   headPivot.add(visorShield);
 
-  // Dual Helmet Headlamp Pods
   const lampMat = new THREE.MeshStandardMaterial({
     color: 0xe0f2fe,
     emissive: 0xbae6fd,
@@ -400,7 +387,6 @@ export function createAstronautMesh(
 
   root.add(headPivot);
 
-  // Optional Invisible Raycast Hit Cylinder for base-wide outpost picking
   if (includeHitCylinder) {
     const hitMesh = new THREE.Mesh(
       new THREE.CylinderGeometry(0.55, 0.55, 2.0, 10),
@@ -426,27 +412,40 @@ export function createAstronautMesh(
   return root;
 }
 
-function waistTrimPlaceholder<T extends THREE.Object3D>(obj: T): T {
-  return obj;
+export interface BuildingMeshOptions {
+  damaged?: boolean;
+  dustPct?: number;
 }
 
 /**
- * Multi-Part High-Detail Outpost Buildings (pivot at bottom-center y=0)
+ * Multi-Part High-Detail Outpost Buildings (all 14 modules + animated shelter/habitat doors + damage/dust visuals)
  */
 export function createBuildingMesh(
   typeId: BuildingTypeId,
   level: number,
   online: boolean,
   shadowTex: THREE.CanvasTexture,
-  solarTex: THREE.CanvasTexture
+  solarTex: THREE.CanvasTexture,
+  options?: BuildingMeshOptions
 ): THREE.Group {
   const group = new THREE.Group();
   addContactShadow(group, 1.85, shadowTex);
 
+  const damaged = Boolean(options?.damaged);
+  const dustRatio = Math.min(1, (options?.dustPct || 0) / 100);
+
+  const hullColor = new THREE.Color(0xe2e8f0);
+  if (dustRatio > 0.05) {
+    hullColor.lerp(new THREE.Color(0x94a3b8), dustRatio * 0.55);
+  }
+  if (damaged) {
+    hullColor.lerp(new THREE.Color(0x7f1d1d), 0.22);
+  }
+
   const hullMat = new THREE.MeshStandardMaterial({
-    color: 0xe2e8f0,
-    roughness: 0.36,
-    metalness: 0.38,
+    color: hullColor,
+    roughness: 0.36 + dustRatio * 0.45,
+    metalness: 0.38 * (1 - dustRatio * 0.5),
   });
   const darkMetal = new THREE.MeshStandardMaterial({
     color: 0x334155,
@@ -454,27 +453,29 @@ export function createBuildingMesh(
     metalness: 0.72,
   });
   const trimGold = new THREE.MeshStandardMaterial({
-    color: 0xeab308,
-    roughness: 0.22,
-    metalness: 0.88,
+    color: damaged ? 0xf97316 : 0xeab308,
+    roughness: 0.24,
+    metalness: 0.85,
   });
   const statusMat = new THREE.MeshStandardMaterial({
-    color: online ? 0x10b981 : 0xf59e0b,
-    emissive: online ? 0x10b981 : 0xf59e0b,
-    emissiveIntensity: 0.95,
+    color: damaged ? 0xef4444 : online ? 0x10b981 : 0xf59e0b,
+    emissive: damaged ? 0xef4444 : online ? 0x10b981 : 0xf59e0b,
+    emissiveIntensity: damaged ? 1.55 : 0.95,
   });
 
-  // Base platform skirt + anchor bolts
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.52, 1.72, 0.22, 32), darkMetal);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.48, 1.68, 0.22, 32), darkMetal);
   base.position.y = 0.11;
   base.receiveShadow = true;
   base.castShadow = true;
   group.add(base);
 
-  const baseRim = new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.055, 10, 32), trimGold);
+  const baseRim = new THREE.Mesh(new THREE.TorusGeometry(1.48, 0.052, 10, 32), trimGold);
   baseRim.rotation.x = Math.PI / 2;
   baseRim.position.y = 0.22;
   group.add(baseRim);
+
+  let shelterDoorLeft: THREE.Mesh | null = null;
+  let shelterDoorRight: THREE.Mesh | null = null;
 
   if (typeId === 'habitat') {
     const cyl = new THREE.Mesh(new THREE.CapsuleGeometry(0.92, 1.55, 14, 32), hullMat);
@@ -484,7 +485,6 @@ export function createBuildingMesh(
     cyl.receiveShadow = true;
     group.add(cyl);
 
-    // Structural pressure ribs
     for (const rx of [-0.65, 0, 0.65]) {
       const rib = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.05, 10, 28), darkMetal);
       rib.rotation.y = Math.PI / 2;
@@ -492,30 +492,39 @@ export function createBuildingMesh(
       group.add(rib);
     }
 
-    const airlock = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.6, 0.85, 20), darkMetal);
-    airlock.rotation.z = Math.PI / 2;
-    airlock.position.set(1.38, 0.82, 0);
+    // Pressurized front airlock alcove + animated sliding refuge door leaves
+    const airlock = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.15, 0.56), darkMetal);
+    airlock.position.set(0, 0.78, 0.92);
     airlock.castShadow = true;
     group.add(airlock);
+
+    const interiorBay = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.68, 0.95),
+      new THREE.MeshBasicMaterial({ color: 0x0c4a6e })
+    );
+    interiorBay.position.set(0, 0.74, 1.205);
+    group.add(interiorBay);
+
+    shelterDoorLeft = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.96, 0.08), hullMat);
+    shelterDoorLeft.position.set(-0.18, 0.74, 1.23);
+    shelterDoorRight = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.96, 0.08), hullMat);
+    shelterDoorRight.position.set(0.18, 0.74, 1.23);
+    group.add(shelterDoorLeft, shelterDoorRight);
 
     const windowMat = new THREE.MeshStandardMaterial({
       color: 0x38bdf8,
       emissive: 0x0ea5e9,
-      emissiveIntensity: online ? 1.05 : 0.2,
+      emissiveIntensity: online && !damaged ? 1.05 : 0.2,
       roughness: 0.15,
       metalness: 0.5,
     });
-    for (const wx of [-0.34, 0.34]) {
-      const frame = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.035, 10, 20), darkMetal);
-      frame.position.set(wx, 1.15, 0.91);
-      const glass = new THREE.Mesh(new THREE.CircleGeometry(0.18, 20), windowMat);
-      glass.position.set(wx, 1.15, 0.925);
+    for (const wx of [-0.72, 0.72]) {
+      const frame = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.035, 10, 20), darkMetal);
+      frame.position.set(wx, 1.15, 0.89);
+      const glass = new THREE.Mesh(new THREE.CircleGeometry(0.16, 20), windowMat);
+      glass.position.set(wx, 1.15, 0.905);
       group.add(frame, glass);
     }
-
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.15, 12), darkMetal);
-    mast.position.set(-0.75, 2.25, 0);
-    group.add(mast);
   } else if (typeId === 'solar') {
     const pylon = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.28, 1.38, 20), darkMetal);
     pylon.position.y = 0.78;
@@ -528,28 +537,25 @@ export function createBuildingMesh(
 
     const panelMat = new THREE.MeshPhysicalMaterial({
       map: solarTex,
-      roughness: 0.16,
-      metalness: 0.72,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.12,
+      color: dustRatio > 0.1 ? new THREE.Color(0xffffff).lerp(new THREE.Color(0x94a3b8), dustRatio * 0.65) : 0xffffff,
+      roughness: 0.16 + dustRatio * 0.55,
+      metalness: 0.72 * (1 - dustRatio * 0.4),
+      clearcoat: 0.9 * (1 - dustRatio * 0.7),
     });
-    const frameMesh = new THREE.Mesh(new THREE.BoxGeometry(2.92, 0.09, 1.56), darkMetal);
+    const tiltZ = damaged ? 0.24 : 0;
+    const frameMesh = new THREE.Mesh(new THREE.BoxGeometry(2.85, 0.09, 1.52), darkMetal);
     frameMesh.position.y = 1.58;
-    frameMesh.rotation.x = 0.35;
+    frameMesh.rotation.set(0.35, 0, tiltZ);
     frameMesh.castShadow = true;
     group.add(frameMesh);
 
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(2.78, 0.04, 1.42), panelMat);
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(2.72, 0.04, 1.38), panelMat);
     wing.position.set(0, 1.62, 0.02);
-    wing.rotation.x = 0.35;
+    wing.rotation.set(0.35, 0, tiltZ);
     wing.castShadow = true;
     group.add(wing);
   } else if (typeId === 'battery') {
-    const cellMat = new THREE.MeshStandardMaterial({
-      color: 0xf59e0b,
-      roughness: 0.3,
-      metalness: 0.6,
-    });
+    const cellMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3, metalness: 0.6 });
     for (let i = -1; i <= 1; i += 2) {
       const cell = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.48, 1.38, 20), darkMetal);
       cell.position.set(i * 0.56, 0.88, 0);
@@ -560,7 +566,10 @@ export function createBuildingMesh(
       band.position.set(i * 0.56, 1.15, 0);
       group.add(band);
 
-      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.46, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), hullMat);
+      const cap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.46, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+        hullMat
+      );
       cap.position.set(i * 0.56, 1.57, 0);
       group.add(cap);
     }
@@ -586,13 +595,12 @@ export function createBuildingMesh(
     group.add(pipe);
   } else if (typeId === 'greenhouse') {
     const soil = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.26, 1.3, 0.26, 28),
+      new THREE.CylinderGeometry(1.24, 1.28, 0.26, 28),
       new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.82 })
     );
     soil.position.y = 0.34;
     group.add(soil);
 
-    // Interior lush crop rows
     const plantMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.72 });
     for (let px = -0.65; px <= 0.65; px += 0.43) {
       const row = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.85, 6, 10), plantMat);
@@ -611,16 +619,15 @@ export function createBuildingMesh(
       depthWrite: false,
     });
     const dome = new THREE.Mesh(
-      new THREE.SphereGeometry(1.38, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.SphereGeometry(1.36, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2),
       domeMat
     );
     dome.position.y = 0.22;
     dome.renderOrder = 2;
     group.add(dome);
 
-    // Geodesic rib arches
     for (let a = 0; a < 3; a++) {
-      const arch = new THREE.Mesh(new THREE.TorusGeometry(1.39, 0.032, 8, 32, Math.PI), darkMetal);
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(1.37, 0.032, 8, 32, Math.PI), darkMetal);
       arch.rotation.y = (a * Math.PI) / 3;
       arch.position.y = 0.22;
       group.add(arch);
@@ -638,10 +645,7 @@ export function createBuildingMesh(
       group.add(leg);
     }
 
-    const auger = new THREE.Mesh(
-      new THREE.ConeGeometry(0.34, 1.65, 18),
-      trimGold
-    );
+    const auger = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.65, 18), trimGold);
     auger.rotation.x = Math.PI;
     auger.position.y = 1.05;
     auger.castShadow = true;
@@ -653,19 +657,29 @@ export function createBuildingMesh(
       metalness: 0.3,
     });
     const bunker = new THREE.Mesh(
-      new THREE.SphereGeometry(1.32, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.52),
+      new THREE.SphereGeometry(1.3, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.52),
       bunkerMat
     );
     bunker.position.y = 0.22;
     bunker.castShadow = true;
     group.add(bunker);
 
-    const hatchFrame = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.06, 10, 20), trimGold);
-    hatchFrame.position.set(0, 0.72, 1.15);
-    const door = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.14, 20), darkMetal);
-    door.rotation.x = Math.PI / 2;
-    door.position.set(0, 0.72, 1.12);
-    group.add(hatchFrame, door);
+    const portalFrame = new THREE.Mesh(new THREE.BoxGeometry(0.96, 1.08, 0.44), darkMetal);
+    portalFrame.position.set(0, 0.72, 1.08);
+    group.add(portalFrame);
+
+    const interior = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.68, 0.88),
+      new THREE.MeshBasicMaterial({ color: 0x064e3b })
+    );
+    interior.position.set(0, 0.7, 1.305);
+    group.add(interior);
+
+    shelterDoorLeft = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.9, 0.09), trimGold);
+    shelterDoorLeft.position.set(-0.18, 0.7, 1.34);
+    shelterDoorRight = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.9, 0.09), trimGold);
+    shelterDoorRight.position.set(0.18, 0.7, 1.34);
+    group.add(shelterDoorLeft, shelterDoorRight);
   } else if (typeId === 'comms') {
     const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.36, 2.25, 16), darkMetal);
     tower.position.y = 1.25;
@@ -688,13 +702,123 @@ export function createBuildingMesh(
       })
     );
     dish.position.set(0, 2.45, 0.15);
-    dish.rotation.x = Math.PI * 0.32;
+    dish.rotation.set(damaged ? Math.PI * 0.55 : Math.PI * 0.32, 0, damaged ? 0.3 : 0);
     group.add(dish);
 
     const feedHorn = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.72, 12), trimGold);
     feedHorn.position.set(0, 2.68, 0.52);
     feedHorn.rotation.x = Math.PI * 0.32;
     group.add(feedHorn);
+  } else if (typeId === 'medical_station') {
+    const bay = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.35, 1.6), hullMat);
+    bay.position.y = 0.88;
+    bay.castShadow = true;
+    group.add(bay);
+
+    const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.95, 0.42, 20), darkMetal);
+    roof.position.y = 1.72;
+    group.add(roof);
+
+    // Distinct glowing red/emerald medical cross emblem
+    const crossMat = new THREE.MeshStandardMaterial({
+      color: 0xf43f5e,
+      emissive: 0xe11d48,
+      emissiveIntensity: online ? 0.9 : 0.2,
+    });
+    const cVert = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.54, 0.06), crossMat);
+    cVert.position.set(0, 0.95, 0.82);
+    const cHoriz = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.18, 0.06), crossMat);
+    cHoriz.position.set(0, 0.95, 0.82);
+    group.add(cVert, cHoriz);
+  } else if (typeId === 'workshop') {
+    const hall = new THREE.Mesh(new THREE.BoxGeometry(2.25, 1.4, 1.75), darkMetal);
+    hall.position.y = 0.92;
+    hall.castShadow = true;
+    group.add(hall);
+
+    const gantryBeam = new THREE.Mesh(new THREE.BoxGeometry(2.55, 0.18, 0.28), trimGold);
+    gantryBeam.position.set(0, 1.98, 0);
+    group.add(gantryBeam);
+
+    for (const gx of [-1.05, 1.05]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 1.85, 10), trimGold);
+      post.position.set(gx, 1.05, 0);
+      group.add(post);
+    }
+  } else if (typeId === 'fuel_depot') {
+    const cryoMat = new THREE.MeshPhysicalMaterial({
+      color: 0xe2e8f0,
+      roughness: 0.25,
+      metalness: 0.7,
+      clearcoat: 0.8,
+    });
+    const sphere1 = new THREE.Mesh(new THREE.SphereGeometry(0.62, 24, 18), cryoMat);
+    sphere1.position.set(-0.62, 0.95, 0);
+    sphere1.castShadow = true;
+    const sphere2 = new THREE.Mesh(new THREE.SphereGeometry(0.62, 24, 18), cryoMat);
+    sphere2.position.set(0.62, 0.95, 0);
+    sphere2.castShadow = true;
+    group.add(sphere1, sphere2);
+
+    const manifold = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.5, 12), trimGold);
+    manifold.rotation.z = Math.PI / 2;
+    manifold.position.set(0, 1.56, 0);
+    group.add(manifold);
+  } else if (typeId === 'rover_garage') {
+    const archMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5, metalness: 0.65 });
+    const bay = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.32, 1.32, 2.2, 20, 1, false, 0, Math.PI),
+      archMat
+    );
+    bay.rotation.z = Math.PI / 2;
+    bay.position.y = 0.24;
+    bay.castShadow = true;
+    group.add(bay);
+
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 1.8), trimGold);
+    pad.position.y = 0.26;
+    group.add(pad);
+  } else if (typeId === 'research_lab') {
+    const labBody = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.24, 1.35, 8), hullMat);
+    labBody.position.y = 0.9;
+    labBody.castShadow = true;
+    group.add(labBody);
+
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.78, 20, 14, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x38bdf8,
+        emissive: 0x0369a1,
+        emissiveIntensity: 0.45,
+        roughness: 0.15,
+        metalness: 0.4,
+      })
+    );
+    dome.position.y = 1.56;
+    group.add(dome);
+  } else {
+    // storage_depot
+    for (const cx of [-0.58, 0.58]) {
+      const crate = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.15, 1.55), hullMat);
+      crate.position.set(cx, 0.78, 0);
+      crate.castShadow = true;
+      group.add(crate);
+
+      const strap = new THREE.Mesh(new THREE.BoxGeometry(0.99, 0.14, 1.59), trimGold);
+      strap.position.set(cx, 1.0, 0);
+      group.add(strap);
+    }
+  }
+
+  // Damage Warning Indicator (crack plates & amber/red strobe beacon)
+  if (damaged) {
+    const hazardBar = new THREE.Mesh(
+      new THREE.TorusGeometry(1.2, 0.055, 8, 28),
+      new THREE.MeshBasicMaterial({ color: 0xef4444 })
+    );
+    hazardBar.rotation.x = Math.PI / 2;
+    hazardBar.position.y = 0.3;
+    group.add(hazardBar);
   }
 
   // Level Status Beacon
@@ -702,7 +826,22 @@ export function createBuildingMesh(
   beacon.position.set(0, 2.65 + (level - 1) * 0.15, 0);
   group.add(beacon);
 
+  group.userData.buildingRefs = {
+    beacon,
+    statusMat,
+    shelterDoorLeft,
+    shelterDoorRight,
+  };
+
   return group;
+}
+
+export function setShelterDoorsOpen(buildingGroup: THREE.Group, open01: number): void {
+  const refs = buildingGroup.userData.buildingRefs;
+  if (!refs) return;
+  const openShift = THREE.MathUtils.clamp(open01, 0, 1) * 0.34;
+  if (refs.shelterDoorLeft) refs.shelterDoorLeft.position.x = -0.18 - openShift;
+  if (refs.shelterDoorRight) refs.shelterDoorRight.position.x = 0.18 + openShift;
 }
 
 /**
@@ -744,13 +883,11 @@ export function createStormFlueMesh(shadowTex: THREE.CanvasTexture): THREE.Group
   stack.castShadow = true;
   group.add(stack);
 
-  // Flared cowl lip at top
   const lip = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.065, 10, 28), hazardMat);
   lip.rotation.x = Math.PI / 2;
   lip.position.y = 3.6;
   group.add(lip);
 
-  // Rotating exhaust turbine inside top of flue
   const fanGroup = new THREE.Group();
   fanGroup.position.y = 3.55;
   for (let i = 0; i < 4; i++) {
@@ -760,13 +897,11 @@ export function createStormFlueMesh(shadowTex: THREE.CanvasTexture): THREE.Group
   }
   group.add(fanGroup);
 
-  // Pressure gauge housing on front
   const gauge = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.15, 24), hazardMat);
   gauge.rotation.x = Math.PI / 2;
   gauge.position.set(0, 1.15, 0.96);
   group.add(gauge);
 
-  // Status beacon
   const beaconMat = new THREE.MeshStandardMaterial({
     color: 0x10b981,
     emissive: 0x10b981,
@@ -801,7 +936,6 @@ export function createDataNodeMesh(
     metalness: 0.78,
   });
 
-  // Sculpted crystalline mineral rock (Icosahedron subdivision 2)
   const rockGeo = new THREE.IcosahedronGeometry(0.5, 2);
   const rPos = rockGeo.attributes.position;
   for (let i = 0; i < rPos.count; i++) {
@@ -838,7 +972,7 @@ export function createDataNodeMesh(
 }
 
 /**
- * 6-Wheel NASA ISRU Rover with Suspension Struts
+ * 6-Wheel NASA ISRU Rover with articulated spinning wheel refs
  */
 export function createRoverMesh(shadowTex: THREE.CanvasTexture): THREE.Group {
   const group = new THREE.Group();
@@ -880,27 +1014,92 @@ export function createRoverMesh(shadowTex: THREE.CanvasTexture): THREE.Group {
   camHead.position.set(0, 1.4, 0.58);
   group.add(camHead);
 
+  const wheelRefs: THREE.Group[] = [];
   for (const sx of [-0.64, 0.64]) {
     for (const sz of [-0.58, 0, 0.58]) {
+      const wheelPivot = new THREE.Group();
+      wheelPivot.position.set(sx, 0.24, sz);
+
       const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.18, 22), wheelMat);
       wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(sx, 0.24, sz);
       wheel.castShadow = true;
-      group.add(wheel);
+      wheelPivot.add(wheel);
 
-      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.2, 14), goldMat);
-      hub.rotation.z = Math.PI / 2;
-      hub.position.set(sx, 0.24, sz);
-      group.add(hub);
+      const hub = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.1), goldMat);
+      wheelPivot.add(hub);
+
+      group.add(wheelPivot);
+      wheelRefs.push(wheelPivot);
     }
   }
 
+  group.userData.roverRefs = { wheelRefs, chassis };
   return group;
 }
 
 /**
- * Procedural High-Resolution Pakistan Flag CanvasTexture (sRGB)
+ * Titan Dragonfly Hexacopter Autonomous Rotorcraft Drone
  */
+export function createTitanDroneMesh(): THREE.Group {
+  const group = new THREE.Group();
+  const hullMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3, metalness: 0.7 });
+  const carbonMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.4 });
+  const bladeMat = new THREE.MeshBasicMaterial({ color: 0xfde68a, transparent: true, opacity: 0.8 });
+
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.55, 8, 12), hullMat);
+  body.rotation.x = Math.PI / 2;
+  group.add(body);
+
+  const rotors: THREE.Group[] = [];
+  const armOffsets: Array<[number, number]> = [
+    [-0.48, 0.36],
+    [0.48, 0.36],
+    [-0.48, -0.36],
+    [0.48, -0.36],
+  ];
+  armOffsets.forEach(([ax, az]) => {
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.52, 8), carbonMat);
+    arm.position.set(ax * 0.55, 0.04, az * 0.55);
+    arm.rotation.z = Math.PI / 2;
+    group.add(arm);
+
+    const rotor = new THREE.Group();
+    rotor.position.set(ax, 0.1, az);
+    const blade1 = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.015, 0.06), bladeMat);
+    const blade2 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.015, 0.42), bladeMat);
+    rotor.add(blade1, blade2);
+    group.add(rotor);
+    rotors.push(rotor);
+  });
+
+  group.userData.droneRefs = { rotors };
+  return group;
+}
+
+/**
+ * Europa Subsurface Thermal Cryo-Drill Probe Rig
+ */
+export function createEuropaProbeMesh(): THREE.Group {
+  const group = new THREE.Group();
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.35, metalness: 0.65 });
+  const glowMat = new THREE.MeshStandardMaterial({
+    color: 0x38bdf8,
+    emissive: 0x0284c7,
+    emissiveIntensity: 1.2,
+  });
+
+  const tripod = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.72, 1.15, 3), frameMat);
+  tripod.position.y = 0.6;
+  group.add(tripod);
+
+  const drillShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.05, 1.85, 14), glowMat);
+  drillShaft.position.y = 0.75;
+  group.add(drillShaft);
+
+  group.userData.probeRefs = { drillShaft };
+  return group;
+}
+
 export function createPakistanFlagTexture(maxAnisotropy = 4): THREE.CanvasTexture {
   const w = 512;
   const h = 340;
@@ -972,9 +1171,6 @@ export function createPakistanFlagTexture(maxAnisotropy = 4): THREE.CanvasTextur
   return tex;
 }
 
-/**
- * Standalone Planted Pakistan Flag Assembly (for Commander Flag-Planting Animation)
- */
 export function createPlantedFlagMesh(
   shadowTex: THREE.CanvasTexture,
   maxAnisotropy = 4
@@ -1014,7 +1210,7 @@ export function createPlantedFlagMesh(
 
   const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.32, 10), poleMat);
   crossbar.rotation.z = Math.PI / 2;
-  crossbar.position.set(0.66, 2.68, 0);
+  crossbar.position.set(0.66, 0.0, 0);
 
   const flagGeo = new THREE.PlaneGeometry(1.32, 0.86, 18, 8);
   const posAttr = flagGeo.attributes.position;
@@ -1045,9 +1241,6 @@ export function createPlantedFlagMesh(
   return group;
 }
 
-/**
- * Procedural NASA Hull Markings Texture (sRGB)
- */
 export function createNasaHullTexture(maxAnisotropy = 4): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -1117,13 +1310,14 @@ export function createNasaHullTexture(maxAnisotropy = 4): THREE.CanvasTexture {
 }
 
 /**
- * High-Detail Cinematic NASA Spaceship Lander with Pakistan Flag (pivot at bottom-center y=0)
+ * High-Detail NASA Spaceship Lander with Sliding Dual Airlock Doors, Lit Interior Alcove, and Foldable Ramp
  */
 export function createNasaSpaceshipMesh(
   shadowTex: THREE.CanvasTexture,
   maxAnisotropy = 4
 ): THREE.Group {
   const group = new THREE.Group();
+  group.rotation.order = 'YXZ';
   addContactShadow(group, 3.3, shadowTex);
 
   const flagTex = createPakistanFlagTexture(maxAnisotropy);
@@ -1171,131 +1365,125 @@ export function createNasaSpaceshipMesh(
     roughness: 0.28,
   });
 
-  // 1. Central Parabolic Engine Bell (LatheGeometry, 36 segs)
+  // 1. Engine Bell
   const bellPts = [
     new THREE.Vector2(0.22, 1.05),
     new THREE.Vector2(0.35, 0.82),
     new THREE.Vector2(0.55, 0.52),
     new THREE.Vector2(0.68, 0.25),
   ];
-  const engineBell = new THREE.Mesh(
-    new THREE.LatheGeometry(bellPts, 36),
-    darkTitaniumMat
-  );
+  const engineBell = new THREE.Mesh(new THREE.LatheGeometry(bellPts, 36), darkTitaniumMat);
   engineBell.castShadow = true;
   group.add(engineBell);
 
-  const coreGlow = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.28, 0.42, 0.14, 24),
-    engineGlowMat
-  );
+  const coreGlow = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, 0.14, 24), engineGlowMat);
   coreGlow.position.y = 0.55;
   group.add(coreGlow);
 
-  // 2. 4 Grounded Landing Legs + Wide Circular Footpads (flush at y=0)
+  // 2. 4 Grounded Landing Legs
   for (let i = 0; i < 4; i++) {
     const angle = (i * Math.PI) / 2 + Math.PI / 4;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
 
-    const pad = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.42, 0.5, 0.12, 22),
-      darkTitaniumMat
-    );
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.12, 22), darkTitaniumMat);
     pad.position.set(cos * 2.25, 0.06, sin * 2.25);
     pad.castShadow = true;
     pad.receiveShadow = true;
     group.add(pad);
 
-    const mainStrut = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.08, 0.1, 1.85, 14),
-      darkTitaniumMat
-    );
+    const mainStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.85, 14), darkTitaniumMat);
     mainStrut.position.set(cos * 1.72, 0.78, sin * 1.72);
     mainStrut.lookAt(cos * 1.1, 1.55, sin * 1.1);
     mainStrut.rotateX(Math.PI / 2);
     mainStrut.castShadow = true;
     group.add(mainStrut);
 
-    const damper = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06, 0.06, 1.25, 12),
-      goldFoilMat
-    );
+    const damper = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.25, 12), goldFoilMat);
     damper.position.set(cos * 1.65, 1.05, sin * 1.65);
     damper.lookAt(cos * 2.25, 0.12, sin * 2.25);
     damper.rotateX(Math.PI / 2);
     group.add(damper);
   }
 
-  // 3. Gold Kapton MLI Descent Stage (16 segments + structural rim)
-  const descentStage = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.5, 1.66, 1.12, 16),
-    goldFoilMat
-  );
+  // 3. Descent Stage
+  const descentStage = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.66, 1.12, 16), goldFoilMat);
   descentStage.position.y = 1.48;
   descentStage.castShadow = true;
   descentStage.receiveShadow = true;
   group.add(descentStage);
 
-  const collarRing = new THREE.Mesh(
-    new THREE.TorusGeometry(1.52, 0.11, 14, 36),
-    darkTitaniumMat
-  );
+  const collarRing = new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.11, 14, 36), darkTitaniumMat);
   collarRing.rotation.x = Math.PI / 2;
   collarRing.position.y = 2.05;
   group.add(collarRing);
 
-  // 4. Primary White Crew / Ascent Fuselage with NASA Markings (36 segments)
-  const crewCabin = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.28, 1.42, 1.65, 36),
-    hullBannerMat
-  );
+  // 4. Primary White Crew Fuselage
+  const crewCabin = new THREE.Mesh(new THREE.CylinderGeometry(1.28, 1.42, 1.65, 36), hullBannerMat);
   crewCabin.position.y = 2.88;
   crewCabin.castShadow = true;
   crewCabin.receiveShadow = true;
   group.add(crewCabin);
 
-  // 5. Tapered Nose Cone & Docking Adapter Cap (36 segments)
-  const noseCone = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.55, 1.28, 1.25, 36),
-    whiteHullMat
-  );
+  // 5. Nose Cone & Cap
+  const noseCone = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 1.28, 1.25, 36), whiteHullMat);
   noseCone.position.y = 4.32;
   noseCone.castShadow = true;
   group.add(noseCone);
 
-  const dockingCap = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.56, 0.56, 0.24, 28),
-    nasaBlueMat
-  );
+  const dockingCap = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.24, 28), nasaBlueMat);
   dockingCap.position.y = 5.05;
   group.add(dockingCap);
 
-  // 6. Forward Cockpit Visor Window + Boarding Airlock Hatch
-  const cockpitFrame = new THREE.Mesh(
-    new THREE.BoxGeometry(0.92, 0.42, 0.24),
-    darkTitaniumMat
-  );
+  // 6. Cockpit Windows + Illuminated Recessed Airlock Frame + Sliding Door Leaves + Hinged Ramp
+  const cockpitFrame = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.42, 0.24), darkTitaniumMat);
   cockpitFrame.position.set(0, 3.82, 1.05);
   cockpitFrame.rotation.x = -0.35;
   group.add(cockpitFrame);
 
-  const cockpitGlass = new THREE.Mesh(
-    new THREE.BoxGeometry(0.76, 0.28, 0.08),
-    visorMat
-  );
+  const cockpitGlass = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.28, 0.08), visorMat);
   cockpitGlass.position.set(0, 3.84, 1.15);
   cockpitGlass.rotation.x = -0.35;
   group.add(cockpitGlass);
 
-  const airlockDoor = new THREE.Mesh(
-    new THREE.BoxGeometry(0.68, 1.05, 0.14),
-    darkTitaniumMat
-  );
-  airlockDoor.position.set(0, 2.58, 1.32);
-  group.add(airlockDoor);
+  const airlockFrame = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.22, 0.22), darkTitaniumMat);
+  airlockFrame.position.set(0, 2.58, 1.3);
+  group.add(airlockFrame);
 
-  // 7. 3 Beveled Aero-Fins in NASA Blue
+  const airlockInteriorMat = new THREE.MeshBasicMaterial({
+    color: 0x0ea5e9,
+    transparent: true,
+    opacity: 0.9,
+  });
+  const airlockInterior = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.04), airlockInteriorMat);
+  airlockInterior.position.set(0, 2.58, 1.415);
+  group.add(airlockInterior);
+
+  const airlockLeftDoor = new THREE.Mesh(new THREE.BoxGeometry(0.37, 1.06, 0.07), whiteHullMat);
+  airlockLeftDoor.position.set(-0.185, 2.58, 1.44);
+  const airlockRightDoor = new THREE.Mesh(new THREE.BoxGeometry(0.37, 1.06, 0.07), whiteHullMat);
+  airlockRightDoor.position.set(0.185, 2.58, 1.44);
+  group.add(airlockLeftDoor, airlockRightDoor);
+
+  // Hinged Boarding/Disembarkation Ramp (rotates cleanly around top hinge instead of stretching!)
+  const rampGroup = new THREE.Group();
+  rampGroup.position.set(0, 1.98, 1.38);
+  const rampDeck = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.1, 3.32), darkTitaniumMat);
+  rampDeck.position.set(0, 0, 1.66);
+  rampDeck.castShadow = true;
+  rampDeck.receiveShadow = true;
+  rampGroup.add(rampDeck);
+  const railMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+  for (const rx of [-0.54, 0.54]) {
+    const rRail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 3.2), railMat);
+    rRail.position.set(rx, 0.08, 1.64);
+    rampGroup.add(rRail);
+  }
+  rampGroup.rotation.x = 1.45; // folded up initially
+  rampGroup.visible = false;
+  group.add(rampGroup);
+
+  // 7. 3 Beveled Aero-Fins
   const finShape = new THREE.Shape();
   finShape.moveTo(0, 0);
   finShape.lineTo(0.68, 0);
@@ -1329,7 +1517,6 @@ export function createNasaSpaceshipMesh(
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,
   });
-
   const flagFrameMat = new THREE.MeshStandardMaterial({
     color: 0xcbd5e1,
     roughness: 0.35,
@@ -1340,14 +1527,11 @@ export function createNasaSpaceshipMesh(
     const plaqueGroup = new THREE.Group();
     plaqueGroup.position.set(side * 1.36, 3.05, 0.15);
     plaqueGroup.rotation.y = (side * Math.PI) / 2;
-
     const frame = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.72, 0.06), flagFrameMat);
     plaqueGroup.add(frame);
-
     const flagPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.98, 0.64), flagHullMat);
     flagPlate.position.z = 0.036;
     plaqueGroup.add(flagPlate);
-
     group.add(plaqueGroup);
   }
 
@@ -1364,7 +1548,30 @@ export function createNasaSpaceshipMesh(
   group.userData.spaceshipRefs = {
     beaconMat,
     engineGlowMat,
+    airlockLeftDoor,
+    airlockRightDoor,
+    airlockInteriorMat,
+    rampGroup,
   };
 
   return group;
+}
+
+export function setShipAirlockAndRamp(
+  ship: THREE.Group,
+  doorOpen01: number,
+  rampDeploy01: number
+): void {
+  const refs = ship.userData.spaceshipRefs;
+  if (!refs) return;
+  const d = THREE.MathUtils.clamp(doorOpen01, 0, 1);
+  const r = THREE.MathUtils.clamp(rampDeploy01, 0, 1);
+  if (refs.airlockLeftDoor) refs.airlockLeftDoor.position.x = -0.185 - d * 0.36;
+  if (refs.airlockRightDoor) refs.airlockRightDoor.position.x = 0.185 + d * 0.36;
+  if (refs.airlockInteriorMat) refs.airlockInteriorMat.opacity = 0.25 + d * 0.75;
+  if (refs.rampGroup) {
+    refs.rampGroup.visible = r > 0.02;
+    // Unfold smoothly from stowed vertical (1.45 rad) down to ground touch (0.64 rad)
+    refs.rampGroup.rotation.x = THREE.MathUtils.lerp(1.45, 0.64, r);
+  }
 }

@@ -6,6 +6,7 @@ import {
   CloudLightning,
   Eye,
   Fan,
+  Shield,
   SkipForward,
   Volume2,
   VolumeX,
@@ -15,15 +16,19 @@ import { ASTRONAUTS } from '../data/astronauts';
 import { getPlanetById } from '../data/planets';
 import type { MissionState, PlanetId } from '../types';
 import { speakNasaText, stopNasaSpeech } from '../utils/nasaVoice';
+import { LANDED_SHIP_YAW } from './MissionLaunchScene';
 import {
   createAstronautMesh,
   createBuildingMesh,
   createContactShadowTexture,
   createNasaSpaceshipMesh,
+  createPlantedFlagMesh,
   createSolarGridTexture,
   createStormFlueMesh,
+  setShelterDoorsOpen,
+  setShipAirlockAndRamp,
 } from './models';
-import { getBuildingWorldPos } from './OutpostScene3D';
+import { getBuildingWorldPos, SPACESHIP_POS, STORM_FLUE_POS } from './OutpostScene3D';
 import {
   createTerrainAndSkyGroup,
   getPlanetEnvironmentSpec,
@@ -38,9 +43,8 @@ interface StormArrivalSceneProps {
   onResolveEmergency?: () => void;
 }
 
-const STORM_SCENE_DURATION = 9.0;
+const STORM_SCENE_DURATION = 9.5;
 
-// Pre-allocated math helpers outside render loop
 const _camPos = new THREE.Vector3();
 const _camLook = new THREE.Vector3();
 const _skyColor = new THREE.Color();
@@ -107,7 +111,7 @@ function getStormTheme(planetId: PlanetId): StormVisualTheme {
     case 'europa':
       return {
         title: 'Cryo-Plume Ice & Radiation Surge',
-        subtitle: 'Subsurface water-vapor gale & freezing micro-ice crystals',
+        subtitle: 'Subsurface water-vapor gale & Jovian radiation front',
         cloudHex: 0x93c5fd,
         cloudDarkHex: 0x0f2744,
         debrisHex: 0xe0f2fe,
@@ -119,8 +123,8 @@ function getStormTheme(planetId: PlanetId): StormVisualTheme {
       };
     default:
       return {
-        title: 'Electrostatic Regolith Storm Front',
-        subtitle: 'Charged lunar dust cloud & solar-wind plasma gust approaching',
+        title: 'Solar-Wind & Micrometeoroid Alert',
+        subtitle: 'Charged electrostatic lunar dust cloud & solar particle surge',
         cloudHex: 0x94a3b8,
         cloudDarkHex: 0x1e293b,
         debrisHex: 0xe2e8f0,
@@ -163,7 +167,7 @@ export default function StormArrivalScene({
 
   const [progressPct, setProgressPct] = useState(0);
   const [stormIntensityUi, setStormIntensityUi] = useState(0.08);
-  const [phaseText, setPhaseText] = useState('Horizon Telemetry: Storm Wall Detected');
+  const [phaseText, setPhaseText] = useState('Horizon Telemetry: Hazard Front Detected');
   const [flashStrength, setFlashStrength] = useState(0);
 
   const onCompleteRef = useRef(onComplete);
@@ -173,7 +177,6 @@ export default function StormArrivalScene({
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // Trigger NASA Flight Officer Elena Vance incoming storm voice alert
   useEffect(() => {
     if (isAudioMuted) {
       stopNasaSpeech();
@@ -181,7 +184,7 @@ export default function StormArrivalScene({
     }
 
     const activeTitle = stateRef.current.activeEvent?.title || theme.title;
-    const spoken = `Attention crew on ${planet.name}! ${activeTitle} inbound from the northern ridge. High-velocity particulates and gale gusts are approaching the outpost. Brace all astronauts, keep visors sealed, and inspect the storm flue as soon as the front hits.`;
+    const spoken = `Attention crew on ${planet.name}! ${activeTitle} inbound. Sounding shelter refuge siren: halt EVA operations, move into nearest pressurized habitat or Starship airlock through the open doors, and assess structural damage after the front clears.`;
     speakNasaText(spoken, {
       muted: isAudioMuted,
       urgent: true,
@@ -262,7 +265,6 @@ export default function StormArrivalScene({
     rimLight.position.set(-14, 12, -24);
     scene.add(rimLight);
 
-    // Dynamic storm lightning / electrostatic discharge flash inside approaching wall
     const stormFlashLight = new THREE.PointLight(theme.lightningHex, 0, 75, 1.4);
     stormFlashLight.position.set(0, 9, -20);
     scene.add(stormFlashLight);
@@ -272,54 +274,107 @@ export default function StormArrivalScene({
     const cloudTex = createCloudPuffTexture();
     const disposables: Array<{ dispose: () => void }> = [shadowTex, solarTex, cloudTex];
 
-    // 1. Planetary Terrain & Sky
+    // 1. Terrain & Deep-Space Sky
     const terrainBundle = createTerrainAndSkyGroup(stateRef.current.planetId, maxAnisotropy);
     scene.add(terrainBundle.group);
 
-    // 2. Outpost Buildings
+    // 2. Outpost Buildings (including shelter door refs & damage visuals)
     const buildingsGroup = new THREE.Group();
     scene.add(buildingsGroup);
+    const refugeBuildings: Array<{ mesh: THREE.Group; insideX: number; insideZ: number; doorX: number; doorZ: number }> = [];
     stateRef.current.buildings.forEach((b) => {
       const pos = getBuildingWorldPos(b.cellIndex);
-      const mesh = createBuildingMesh(b.typeId, b.level, b.online, shadowTex, solarTex);
-      mesh.position.set(
-        pos.x,
-        groundHeightAt(stateRef.current.planetId, pos.x, pos.z),
-        pos.z
-      );
+      const mesh = createBuildingMesh(b.typeId, b.level, b.online, shadowTex, solarTex, {
+        damaged: b.damaged,
+        dustPct: b.dustPct,
+      });
+      mesh.position.set(pos.x, groundHeightAt(stateRef.current.planetId, pos.x, pos.z), pos.z);
       buildingsGroup.add(mesh);
+      if (b.typeId === 'radiation_shelter' || b.typeId === 'habitat') {
+        refugeBuildings.push({
+          mesh,
+          insideX: pos.x,
+          insideZ: pos.z + 1.0,
+          doorX: pos.x,
+          doorZ: pos.z + 2.35,
+        });
+      }
     });
 
-    // 3. Storm Flue Station & NASA Starship
+    // 3. Storm Flue Station & Synchronized Starship
     const stormFlue = createStormFlueMesh(shadowTex);
-    stormFlue.position.set(0, groundHeightAt(stateRef.current.planetId, 0, -5.8), -5.8);
+    stormFlue.position.set(
+      STORM_FLUE_POS.x,
+      groundHeightAt(stateRef.current.planetId, STORM_FLUE_POS.x, STORM_FLUE_POS.z),
+      STORM_FLUE_POS.z
+    );
     scene.add(stormFlue);
 
     const spaceship = createNasaSpaceshipMesh(shadowTex, maxAnisotropy);
     spaceship.position.set(
-      11.8,
-      groundHeightAt(stateRef.current.planetId, 11.8, -4.8),
-      -4.8
+      SPACESHIP_POS.x,
+      groundHeightAt(stateRef.current.planetId, SPACESHIP_POS.x, SPACESHIP_POS.z),
+      SPACESHIP_POS.z
     );
-    spaceship.rotation.y = -Math.PI * 0.58;
+    spaceship.rotation.y = LANDED_SHIP_YAW;
+    setShipAirlockAndRamp(spaceship, 0, 0);
     scene.add(spaceship);
 
-    // 4. 6 Astronauts facing toward the incoming storm horizon, bracing against wind
+    const shipRefuge = {
+      insideX: SPACESHIP_POS.x + Math.sin(LANDED_SHIP_YAW) * 1.4,
+      insideZ: SPACESHIP_POS.z + Math.cos(LANDED_SHIP_YAW) * 1.4,
+      doorX: SPACESHIP_POS.x + Math.sin(LANDED_SHIP_YAW) * 3.1,
+      doorZ: SPACESHIP_POS.z + Math.cos(LANDED_SHIP_YAW) * 3.1,
+    };
+
+    // Permanent Expedition Flag (persists during storm!)
+    const activeFlag = stateRef.current.flagsByWorld[stateRef.current.planetId];
+    if (activeFlag?.planted) {
+      const flagMesh = createPlantedFlagMesh(shadowTex, maxAnisotropy);
+      flagMesh.position.set(
+        activeFlag.x,
+        groundHeightAt(stateRef.current.planetId, activeFlag.x, activeFlag.z),
+        activeFlag.z
+      );
+      scene.add(flagMesh);
+    }
+
+    // 4. 6 Astronauts initially outside, then smoothly walking into open shelter/spaceship doors
     const crewEntries = ASTRONAUTS.map((profile, idx) => {
       const mesh = createAstronautMesh(profile, shadowTex, false);
-      const bx = -4.2 + idx * 1.68;
-      const bz = 4.6 + (idx % 2 === 0 ? 0.5 : -0.4);
+      const bx = -4.2 + idx * 1.75;
+      const bz = 5.4 + (idx % 2 === 0 ? 0.6 : -0.4);
       const by = groundHeightAt(stateRef.current.planetId, bx, bz);
       mesh.position.set(bx, by, bz);
-      mesh.rotation.y = Math.PI + (idx - 2.5) * 0.08;
+      mesh.rotation.y = Math.PI;
       scene.add(mesh);
-      return { mesh, baseX: bx, baseY: by, baseZ: bz, idx };
+
+      // Assign nearest refuge (building or ship)
+      let bestTarget = shipRefuge;
+      let minDist = Math.hypot(bx - shipRefuge.doorX, bz - shipRefuge.doorZ);
+      for (const rb of refugeBuildings) {
+        const d = Math.hypot(bx - rb.doorX, bz - rb.doorZ);
+        if (d < minDist) {
+          minDist = d;
+          bestTarget = rb;
+        }
+      }
+
+      return {
+        mesh,
+        x: bx,
+        z: bz,
+        yaw: Math.PI,
+        walkPhase: idx * 0.8,
+        idx,
+        target: bestTarget,
+        sheltered: false,
+      };
     });
 
-    // 5. Massive Advancing Volumetric-Style Storm Wall (42 Layered Billowing Cloud Puffs)
+    // 5. Advancing Storm Cloud Wall
     const stormWallGroup = new THREE.Group();
     scene.add(stormWallGroup);
-
     const cloudSprites: Array<{
       sprite: THREE.Sprite;
       baseX: number;
@@ -329,8 +384,7 @@ export default function StormArrivalScene({
       phase: number;
     }> = [];
 
-    const cloudCount = 42;
-    for (let i = 0; i < cloudCount; i++) {
+    for (let i = 0; i < 42; i++) {
       const mat = new THREE.SpriteMaterial({
         map: cloudTex,
         color: i % 3 === 0 ? theme.cloudDarkHex : theme.cloudHex,
@@ -358,7 +412,6 @@ export default function StormArrivalScene({
       });
     }
 
-    // 6. 520 High-Speed Wind-Blown Storm Debris & Particulate Streaks
     const debrisCount = 520;
     const debrisPos = new Float32Array(debrisCount * 3);
     const debrisSpeed = new Float32Array(debrisCount);
@@ -382,7 +435,6 @@ export default function StormArrivalScene({
     debrisPoints.frustumCulled = false;
     scene.add(debrisPoints);
 
-    // 7. Rolling Ground Dust Front Ring
     const gustRingMat = new THREE.MeshBasicMaterial({
       color: theme.cloudHex,
       transparent: true,
@@ -395,12 +447,11 @@ export default function StormArrivalScene({
     gustRing.position.set(0, 0.14, -22);
     scene.add(gustRing);
 
-    // 8. Procedural Howling Planetary Storm Wind Audio
+    // Wind audio
     let audioCtx: AudioContext | null = null;
     let windGain: GainNode | null = null;
     let windFilter: BiquadFilterNode | null = null;
     let noiseSrc: AudioBufferSourceNode | null = null;
-
     if (!isAudioMuted) {
       try {
         const AudioCtx =
@@ -411,37 +462,28 @@ export default function StormArrivalScene({
           const bufLen = audioCtx.sampleRate * 2;
           const noiseBuf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
           const ch = noiseBuf.getChannelData(0);
-          for (let i = 0; i < bufLen; i++) {
-            ch[i] = Math.random() * 2 - 1;
-          }
+          for (let i = 0; i < bufLen; i++) ch[i] = Math.random() * 2 - 1;
           noiseSrc = audioCtx.createBufferSource();
           noiseSrc.buffer = noiseBuf;
           noiseSrc.loop = true;
-
           windFilter = audioCtx.createBiquadFilter();
           windFilter.type = 'bandpass';
           windFilter.frequency.value = 260;
           windFilter.Q.value = 1.1;
-
           windGain = audioCtx.createGain();
           windGain.gain.value = 0.002;
-
           noiseSrc.connect(windFilter);
           windFilter.connect(windGain);
           windGain.connect(audioCtx.destination);
           noiseSrc.start();
-          if (audioCtx.state === 'suspended') {
-            audioCtx.resume().catch(() => {});
-          }
+          if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
         }
       } catch {
         audioCtx = null;
       }
     }
 
-    if (!isSoftwareGl) {
-      renderer.compile(scene, camera);
-    }
+    if (!isSoftwareGl) renderer.compile(scene, camera);
 
     const handleResize = () => {
       const w = container.clientWidth || 960;
@@ -490,9 +532,8 @@ export default function StormArrivalScene({
               return;
             }
             const status = gl.getSyncParameter(sync, gl.SYNC_STATUS);
-            if (status === gl.UNSIGNALED) {
-              frameId = window.setTimeout(poll, 5);
-            } else {
+            if (status === gl.UNSIGNALED) frameId = window.setTimeout(poll, 5);
+            else {
               gl.deleteSync(sync);
               frameId = window.setTimeout(cb, 80);
             }
@@ -506,11 +547,8 @@ export default function StormArrivalScene({
 
     const scheduleNextTick = () => {
       if (disposed || contextLost) return;
-      if (isSoftwareGl) {
-        afterDraw(tick);
-      } else {
-        frameId = requestAnimationFrame(tick);
-      }
+      if (isSoftwareGl) afterDraw(tick);
+      else frameId = requestAnimationFrame(tick);
     };
 
     const tick = () => {
@@ -527,7 +565,6 @@ export default function StormArrivalScene({
         setProgressPct(pct);
       }
 
-      // Storm front progression curve: builds from 0.1 to 1.0 as wall sweeps from z=-54 to z=+4
       const arrivalRamp = THREE.MathUtils.smoothstep(p, 0.04, 0.78);
       const intensityStep = Math.round(arrivalRamp * 25) / 25;
       if (intensityStep !== lastIntensityStep) {
@@ -535,19 +572,28 @@ export default function StormArrivalScene({
         setStormIntensityUi(intensityStep);
       }
 
-      const phaseIdx = p < 0.35 ? 0 : p < 0.7 ? 1 : 2;
+      const phaseIdx = p < 0.22 ? 0 : p < 0.68 ? 1 : 2;
       if (phaseIdx !== lastPhaseIdx) {
         lastPhaseIdx = phaseIdx;
         if (phaseIdx === 0) {
-          setPhaseText('Horizon Telemetry: Massive Storm Wall Advancing');
+          setPhaseText('Hazard Alert: Storm Front Detected · Opening Refuge Doors');
         } else if (phaseIdx === 1) {
-          setPhaseText('Perimeter Alert: Gale Winds Hitting Outpost & Storm Flue');
+          setPhaseText('Emergency Refuge: Astronauts Entering Habitats & Starship Airlock');
         } else {
-          setPhaseText('Storm Impact: Crew Braced · Clear Storm Flue & Seal Airlocks');
+          setPhaseText('Crew Safely Sheltered · Doors Sealed Against Impact');
         }
       }
 
-      // Move entire cloud wall forward toward outpost & swirl individual puffs
+      terrainBundle.updateSkyEffects(elapsed, dt);
+
+      // Door opening / sealing sequence
+      // 0..0.18 -> brace; 0.16..0.75 -> doors open wide while crew enters; 0.75..0.9 -> doors seal shut
+      const allSheltered = crewEntries.every((c) => c.sheltered);
+      const doorTarget = p > 0.1 && (!allSheltered || p < 0.76) ? 1.0 : 0.0;
+      refugeBuildings.forEach((rb) => setShelterDoorsOpen(rb.mesh, doorTarget));
+      setShipAirlockAndRamp(spaceship, doorTarget, doorTarget);
+
+      // Advance storm wall
       const wallZ = THREE.MathUtils.lerp(-54, 4, Math.pow(p, 0.85));
       stormWallGroup.position.set(Math.sin(elapsed * 0.7) * 1.4, 0, wallZ);
 
@@ -557,7 +603,6 @@ export default function StormArrivalScene({
         (c.sprite.material as THREE.SpriteMaterial).opacity = 0.48 + arrivalRamp * 0.42;
       });
 
-      // Electrostatic lightning pulses as storm arrives
       const pulseA = Math.max(0, Math.sin(elapsed * 7.3) * Math.sin(elapsed * 19.1));
       const lightning = arrivalRamp > 0.25 && pulseA > 0.74 ? (pulseA - 0.74) * 3.8 : 0;
       stormFlashLight.position.set(Math.sin(elapsed * 2.1) * 8, 9, wallZ + 4);
@@ -568,13 +613,10 @@ export default function StormArrivalScene({
         setFlashStrength(flashStep);
       }
 
-      // Darken sky and thicken planetary storm fog
       _skyColor.setHex(spec.skyColor);
       _stormSkyColor.setHex(theme.stormSkyHex);
       _skyColor.lerp(_stormSkyColor, arrivalRamp * 0.78);
-      if (lightning > 0.1) {
-        _skyColor.offsetHSL(0, 0, lightning * 0.08);
-      }
+      if (lightning > 0.1) _skyColor.offsetHSL(0, 0, lightning * 0.08);
       scene.background = _skyColor;
 
       _fogColor.setHex(spec.fogColor);
@@ -586,7 +628,6 @@ export default function StormArrivalScene({
       sunLight.intensity = spec.sunIntensity * (1 - arrivalRamp * 0.55) + lightning * 1.4;
       hemiLight.intensity = spec.hemiIntensity * (1 - arrivalRamp * 0.3);
 
-      // Animate 520 Wind Debris Particles rushing from -Z toward +Z (and +X crosswind)
       const dAttr = debrisGeo.attributes.position as THREE.BufferAttribute;
       const gustMult = 0.75 + arrivalRamp * 2.2;
       for (let i = 0; i < debrisCount; i++) {
@@ -604,12 +645,10 @@ export default function StormArrivalScene({
       dAttr.needsUpdate = true;
       debrisMat.opacity = 0.22 + arrivalRamp * 0.65;
 
-      // Ground gust ring sweeping into the outpost
       gustRing.position.z = wallZ + 7;
       gustRing.scale.setScalar(1 + arrivalRamp * 1.6);
       gustRingMat.opacity = 0.14 + arrivalRamp * 0.28;
 
-      // Storm flue turbine spins faster & beacon flashes amber/red
       const flueRefs = stormFlue.userData.stormFlueRefs;
       if (flueRefs) {
         flueRefs.fanGroup.rotation.y += dt * (2.5 + arrivalRamp * 8.5);
@@ -618,45 +657,67 @@ export default function StormArrivalScene({
         flueRefs.beaconMat.emissive.setHex(alarm);
       }
 
-      // Spaceship beacon pulse
       const shipRefs = spaceship.userData.spaceshipRefs;
       if (shipRefs) {
         shipRefs.beaconMat.emissiveIntensity = 0.8 + 0.7 * Math.sin(elapsed * 5);
       }
 
-      // Astronauts visibly brace into the incoming storm wind
+      // Astronauts: first brace (p < 0.18), then sprint smoothly into open doors at full scale (1.0)!
       crewEntries.forEach((c) => {
-        const brace = THREE.MathUtils.smoothstep(arrivalRamp, 0.1, 0.85);
-        const sway = Math.sin(elapsed * 5.2 + c.idx * 1.3) * 0.04 * brace;
-        c.mesh.rotation.x = -0.18 * brace + sway;
-        c.mesh.position.y = c.baseY;
         const refs = c.mesh.userData.animRefs;
-        if (refs) {
-          // Raise arms to shield helmet visor from blowing dust/debris
-          refs.leftArm.rotation.x = THREE.MathUtils.lerp(0, -1.35, brace);
-          refs.leftArm.rotation.z = THREE.MathUtils.lerp(0, -0.35, brace);
-          refs.rightArm.rotation.x = THREE.MathUtils.lerp(0, -1.15, brace);
-          refs.rightArm.rotation.z = THREE.MathUtils.lerp(0, 0.32, brace);
-          if (refs.visorMat) {
-            refs.visorMat.emissiveIntensity = 0.2 + brace * 0.55;
+        if (p < 0.16) {
+          const brace = THREE.MathUtils.smoothstep(p, 0.02, 0.16);
+          c.mesh.rotation.x = -0.15 * brace;
+          c.mesh.position.y = groundHeightAt(stateRef.current.planetId, c.x, c.z);
+          if (refs) {
+            refs.leftArm.rotation.x = -1.2 * brace;
+            refs.rightArm.rotation.x = -1.05 * brace;
+            refs.selectionRing.visible = false;
           }
-          refs.selectionRing.visible = false;
+        } else if (!c.sheltered) {
+          c.mesh.rotation.x = 0;
+          const distDoor = Math.hypot(c.target.doorX - c.x, c.target.doorZ - c.z);
+          const tx = distDoor > 0.55 ? c.target.doorX : c.target.insideX;
+          const tz = distDoor > 0.55 ? c.target.doorZ : c.target.insideZ;
+          const dx = tx - c.x;
+          const dz = tz - c.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist < 0.35 && distDoor <= 0.65) {
+            c.sheltered = true;
+            c.mesh.visible = false;
+          } else if (dist > 0.05) {
+            const step = Math.min(dist, 5.4 * dt);
+            c.x += (dx / dist) * step;
+            c.z += (dz / dist) * step;
+            c.yaw = Math.atan2(dx, dz);
+            c.walkPhase += dt * 11;
+            const swing = Math.sin(c.walkPhase) * 0.6;
+            if (refs) {
+              refs.leftLeg.rotation.x = swing;
+              refs.rightLeg.rotation.x = -swing;
+              refs.leftArm.rotation.x = -swing * 0.8;
+              refs.rightArm.rotation.x = swing * 0.8;
+              refs.selectionRing.visible = false;
+            }
+          }
+          c.mesh.position.set(c.x, groundHeightAt(stateRef.current.planetId, c.x, c.z), c.z);
+          c.mesh.rotation.y = c.yaw;
+          c.mesh.scale.setScalar(1);
         }
       });
 
-      // Cinematic tracking camera: sweeps from behind astronauts looking at advancing wall, with wind buffet
-      const buffet = arrivalRamp * 0.095;
+      const buffet = arrivalRamp * 0.08;
       const shakeX = Math.sin(elapsed * 31) * buffet;
       const shakeY = Math.cos(elapsed * 37) * buffet;
       _camPos.set(
-        THREE.MathUtils.lerp(-5.5, 4.2, p) + shakeX,
-        THREE.MathUtils.lerp(3.2, 4.8, p) + shakeY,
-        THREE.MathUtils.lerp(13.5, 11.2, p)
+        THREE.MathUtils.lerp(-5.2, 6.2, p) + shakeX,
+        THREE.MathUtils.lerp(3.4, 5.2, p) + shakeY,
+        THREE.MathUtils.lerp(13.8, 12.2, p)
       );
       _camLook.set(
-        THREE.MathUtils.lerp(0, -0.8, p),
-        THREE.MathUtils.lerp(3.2, 2.2, p),
-        THREE.MathUtils.lerp(-18, -4, p)
+        THREE.MathUtils.lerp(0, 1.8, p),
+        THREE.MathUtils.lerp(2.6, 2.0, p),
+        THREE.MathUtils.lerp(-14, 1.5, p)
       );
       camera.position.copy(_camPos);
       camera.lookAt(_camLook);
@@ -666,15 +727,14 @@ export default function StormArrivalScene({
         if (mutedRef.current) {
           windGain.gain.setTargetAtTime(0.0001, ct, 0.05);
         } else {
-          const targetVol = 0.015 + arrivalRamp * 0.075;
-          windGain.gain.setTargetAtTime(targetVol, ct, 0.1);
+          windGain.gain.setTargetAtTime(0.015 + arrivalRamp * 0.075, ct, 0.1);
           windFilter.frequency.setTargetAtTime(220 + arrivalRamp * 460, ct, 0.12);
         }
       }
 
       renderer.render(scene, camera);
 
-      if (elapsed >= STORM_SCENE_DURATION + 0.45 && !completed) {
+      if (elapsed >= STORM_SCENE_DURATION + 0.4 && !completed) {
         completed = true;
         stopNasaSpeech();
         onCompleteRef.current();
@@ -693,18 +753,14 @@ export default function StormArrivalScene({
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
       resizeObserver.disconnect();
-
       if (audioCtx) {
         try {
           noiseSrc?.stop();
-          if (audioCtx.state !== 'closed') {
-            audioCtx.close().catch(() => {});
-          }
+          if (audioCtx.state !== 'closed') audioCtx.close().catch(() => {});
         } catch {
-          // Ignore audio cleanup errors
+          // ignore
         }
       }
-
       terrainBundle.dispose();
       scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
@@ -736,7 +792,6 @@ export default function StormArrivalScene({
     <div className="relative w-full h-screen overflow-hidden bg-[#05070C] text-slate-100 select-none">
       <div ref={mountRef} className="w-full h-full" />
 
-      {/* Subtle Atmospheric Storm Overlay & Lightning Flash (Zero Backdrop-Blur) */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
@@ -762,13 +817,12 @@ export default function StormArrivalScene({
         )}
       </div>
 
-      {/* Top Storm Warning Header */}
       <header className="absolute top-0 inset-x-0 z-20 bg-[#0F1623]/94 border-b border-amber-500/40 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-[11px] font-mono uppercase tracking-wider text-amber-400 flex items-center gap-2">
             <CloudLightning className="w-3.5 h-3.5" />
             <span>
-              Day {String(state.day).padStart(2, '0')} · {planet.name} Storm Warning
+              Day {String(state.day).padStart(2, '0')} · {planet.name} Emergency Refuge
             </span>
           </div>
           <h1 className="font-display text-lg sm:text-xl font-bold text-white">{theme.title}</h1>
@@ -816,7 +870,6 @@ export default function StormArrivalScene({
         </div>
       </header>
 
-      {/* Bottom Storm Telemetry Dock */}
       <footer className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[min(900px,95vw)] rounded-xl bg-[#0F1623]/94 border border-slate-800 px-4 py-3 flex flex-col gap-2.5">
         <div className="w-full h-1.5 rounded-full bg-[#07090E] border border-slate-800 overflow-hidden">
           <div
@@ -827,7 +880,7 @@ export default function StormArrivalScene({
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
           <span className="text-amber-200 flex items-center gap-1.5">
-            <CloudLightning className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <Shield className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             {phaseText}
           </span>
 

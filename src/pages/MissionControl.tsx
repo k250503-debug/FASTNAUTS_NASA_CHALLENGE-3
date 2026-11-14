@@ -2,8 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
+  ArrowUp,
   ArrowUpCircle,
+  Award,
   Bot,
+  Car,
   CheckCircle2,
   CloudLightning,
   Compass,
@@ -12,13 +15,18 @@ import {
   EyeOff,
   Fan,
   FlaskConical,
+  Fuel,
   Globe,
+  HeartPulse,
   LogOut,
+  Package,
   Pause,
   Play,
+  PlusCircle,
   Power,
   Radio,
   Rocket,
+  Shield,
   Sliders,
   Target,
   User,
@@ -27,22 +35,40 @@ import {
   Volume2,
   VolumeX,
   Wind,
+  Wrench,
   X,
   Zap,
 } from 'lucide-react';
-import MissionChart from '../components/MissionChart';
 import AdvisorModal from '../components/AdvisorModal';
 import AstronautView from '../components/AstronautView';
+import EngineeringMiniGameModal from '../components/EngineeringMiniGameModal';
+import MissionChart from '../components/MissionChart';
+import OperationsModals, { type OpsModalKind } from '../components/OperationsModals';
+import TacticalMinimap from '../components/TacticalMinimap';
 import TaskAnimationView, {
   type ActiveTaskDuty,
   type AstronautTaskKind,
 } from '../components/TaskAnimationView';
 import { ASTRONAUTS, getAstronautById } from '../data/astronauts';
 import { getBuildingDef } from '../data/buildings';
-import { PLANETS } from '../data/planets';
+import { getPlanetById, PLANETS } from '../data/planets';
+import { SPARE_PART_DEFS } from '../data/systems';
 import { calculateDailyPreview } from '../simulation/calculations';
-import OutpostScene3D, { type NearbyTarget } from '../three/OutpostScene3D';
-import type { AstronautId, MissionState, PlanetId, SuitPartId } from '../types';
+import OutpostScene3D, {
+  type NearbyTarget,
+  type OutpostCameraMode,
+} from '../three/OutpostScene3D';
+import { ROAMING_RADIUS } from '../three/terrain';
+import type {
+  AstronautId,
+  BuildingTypeId,
+  ConstructionMaterialId,
+  MiniGameKind,
+  MissionState,
+  PlanetId,
+  SparePartId,
+  SuitPartId,
+} from '../types';
 import {
   buildAstronautVoiceScript,
   detectCriticalMissionAlert,
@@ -57,6 +83,7 @@ interface MissionControlProps {
   onAdvanceDay: () => void;
   onToggleBuilding: (uid: string) => void;
   onUpgradeBuilding: (uid: string) => void;
+  onConstructBuilding: (typeId: BuildingTypeId, cellIndex: number) => void;
   onResearchTech: (techId: 'water' | 'solar' | 'crop', cost: number) => void;
   onSelectAstronaut: (id: AstronautId) => void;
   onInspectStormFlue: () => void;
@@ -64,6 +91,21 @@ interface MissionControlProps {
   onServiceBuilding: (uid: string) => void;
   onPerformSuitDiagnostic: (partId: SuitPartId, astronautId: AstronautId) => void;
   onTravelToWorld: (planetId: PlanetId) => void;
+  onSynthesizeFuel: () => void;
+  onRefuelStarship: () => void;
+  onDiagnoseCrew: (id: AstronautId) => void;
+  onTreatCrew: (id: AstronautId) => void;
+  onCommsStep: (step: 'inspect' | 'diagnose' | 'replace' | 'test') => void;
+  onCraftPart: (partId: SparePartId) => void;
+  onRecycleScrap: (material: ConstructionMaterialId) => void;
+  onOrderResupply: (bundle: 'spare_bundle' | 'med_bundle' | 'antenna_kit') => void;
+  onInspectBuildingDamage: (uid: string) => void;
+  onRepairBuilding: (uid: string) => void;
+  onCleanDust: (uid?: string) => void;
+  onRepairRover: () => void;
+  onRechargeRover: () => void;
+  onToggleRoverDrive: () => void;
+  onToggleShelterRefuge: () => void;
   onTriggerStormScene?: () => void;
   onOpenEmergency: () => void;
   onExitMission: () => void;
@@ -76,6 +118,7 @@ export default function MissionControl({
   onAdvanceDay,
   onToggleBuilding,
   onUpgradeBuilding,
+  onConstructBuilding,
   onResearchTech,
   onSelectAstronaut,
   onInspectStormFlue,
@@ -83,6 +126,21 @@ export default function MissionControl({
   onServiceBuilding,
   onPerformSuitDiagnostic,
   onTravelToWorld,
+  onSynthesizeFuel,
+  onRefuelStarship,
+  onDiagnoseCrew,
+  onTreatCrew,
+  onCommsStep,
+  onCraftPart,
+  onRecycleScrap,
+  onOrderResupply,
+  onInspectBuildingDamage,
+  onRepairBuilding,
+  onCleanDust,
+  onRepairRover,
+  onRechargeRover,
+  onToggleRoverDrive,
+  onToggleShelterRefuge,
   onTriggerStormScene,
   onOpenEmergency,
   onExitMission,
@@ -90,13 +148,27 @@ export default function MissionControl({
   const [paused, setPaused] = useState(false);
   const [hudHidden, setHudHidden] = useState(false);
   const [sceneMode, setSceneMode] = useState<'outpost' | 'astronaut'>('outpost');
-  const [cameraMode, setCameraMode] = useState<'follow' | 'overview'>('follow');
+  const [cameraMode, setCameraMode] = useState<OutpostCameraMode>('follow');
   const [nearbyTarget, setNearbyTarget] = useState<NearbyTarget | null>(null);
+  const [nearBoundary, setNearBoundary] = useState(false);
+  const [mapPositions, setMapPositions] = useState<{
+    astronauts: Array<{ id: AstronautId; x: number; z: number }>;
+    rover: { x: number; z: number; yaw: number };
+  }>({ astronauts: [], rover: { x: 10.5, z: 9.8, yaw: 0 } });
+
   const [selectedResource, setSelectedResource] = useState<string | null>(null);
   const [selectedBuildingUid, setSelectedBuildingUid] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<
     'research' | 'objectives' | 'resources' | 'telemetry' | null
   >(null);
+  const [opsModal, setOpsModal] = useState<OpsModalKind>(null);
+  const [pendingTransitWorld, setPendingTransitWorld] = useState<PlanetId | null>(null);
+  const [miniGameState, setMiniGameState] = useState<{
+    kind: MiniGameKind;
+    title: string;
+    onWin: () => void;
+  } | null>(null);
+
   const [advisorOpen, setAdvisorOpen] = useState(false);
   const [busyDuty, setBusyDuty] = useState<ActiveTaskDuty | null>(null);
   const [capcomBanner, setCapcomBanner] = useState<{
@@ -104,7 +176,9 @@ export default function MissionControl({
     text: string;
     severity: 'info' | 'warning' | 'danger';
   } | null>(null);
+
   const interactRef = useRef<(() => void) | null>(null);
+  const jumpRef = useRef<(() => void) | null>(null);
   const busyTimerRef = useRef<number | null>(null);
   const bannerTimerRef = useRef<number | null>(null);
   const spokenAlertKeysRef = useRef<Set<string>>(new Set());
@@ -114,20 +188,14 @@ export default function MissionControl({
 
   useEffect(() => {
     return () => {
-      if (busyTimerRef.current !== null) {
-        window.clearTimeout(busyTimerRef.current);
-      }
-      if (bannerTimerRef.current !== null) {
-        window.clearTimeout(bannerTimerRef.current);
-      }
+      if (busyTimerRef.current !== null) window.clearTimeout(busyTimerRef.current);
+      if (bannerTimerRef.current !== null) window.clearTimeout(bannerTimerRef.current);
       stopNasaSpeech();
     };
   }, []);
 
   useEffect(() => {
-    if (isAudioMuted) {
-      stopNasaSpeech();
-    }
+    if (isAudioMuted) stopNasaSpeech();
   }, [isAudioMuted]);
 
   const showCapcomBanner = (
@@ -136,9 +204,7 @@ export default function MissionControl({
     severity: 'info' | 'warning' | 'danger',
     durationMs = 9500
   ) => {
-    if (bannerTimerRef.current !== null) {
-      window.clearTimeout(bannerTimerRef.current);
-    }
+    if (bannerTimerRef.current !== null) window.clearTimeout(bannerTimerRef.current);
     setCapcomBanner({ title, text, severity });
     bannerTimerRef.current = window.setTimeout(() => {
       setCapcomBanner(null);
@@ -150,12 +216,7 @@ export default function MissionControl({
     const currentState = stateRef.current;
     const astro = getAstronautById(astroId);
     const script = buildAstronautVoiceScript(astro, currentState);
-    showCapcomBanner(
-      `Flight Officer Elena Vance · ${astro.name}`,
-      script,
-      'info',
-      11000
-    );
+    showCapcomBanner(`Flight Officer Elena Vance · ${astro.name}`, script, 'info', 11000);
     speakNasaText(script, {
       muted: isAudioMuted,
       rate: 0.98,
@@ -163,13 +224,11 @@ export default function MissionControl({
     });
   };
 
-  // Speak per-character NASA task & survival guidance when switching astronauts or worlds
   useEffect(() => {
     announceAstronautBriefing(state.activeAstronautId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.activeAstronautId, state.planetId]);
 
-  // Automatic urgent female NASA Capcom voice alert on storms, flue blockages, or shortages
   useEffect(() => {
     const alert = detectCriticalMissionAlert(state);
     if (!alert) return;
@@ -210,11 +269,9 @@ export default function MissionControl({
     label: string,
     detail: string,
     astronautId: AstronautId = state.activeAstronautId,
-    durationMs = 2800
+    durationMs = 2400
   ) => {
-    if (busyTimerRef.current !== null) {
-      window.clearTimeout(busyTimerRef.current);
-    }
+    if (busyTimerRef.current !== null) window.clearTimeout(busyTimerRef.current);
     dutySeqRef.current += 1;
     setBusyDuty({
       astronautId,
@@ -231,6 +288,7 @@ export default function MissionControl({
     }, durationMs);
   };
 
+  const planet = getPlanetById(state.planetId);
   const preview = calculateDailyPreview(state);
   const powerPct = Math.round(
     (state.resources.battery.current / state.resources.battery.max) * 100
@@ -239,6 +297,16 @@ export default function MissionControl({
   const activeAstronaut = getAstronautById(state.activeAstronautId);
   const activeProgress = state.crewProgress[state.activeAstronautId];
   const isActiveBusy = busyDuty?.astronautId === state.activeAstronautId;
+
+  const medicalAlertsCount = Object.values(state.crewVitals).filter(
+    (v) => v.medicalAlert !== null
+  ).length;
+  const lowPartsCount = SPARE_PART_DEFS.filter(
+    (p) => (state.spareParts[p.id] || 0) < p.criticalMin
+  ).length;
+  const damagedCount =
+    state.buildings.filter((b) => b.damaged || b.conditionPct < 88).length +
+    (state.rover.damaged ? 1 : 0);
 
   const selectedBuilding = state.buildings.find((b) => b.uid === selectedBuildingUid);
   const selectedBuildingDef = selectedBuilding ? getBuildingDef(selectedBuilding.typeId) : null;
@@ -262,6 +330,11 @@ export default function MissionControl({
   const handleServiceAndSelectBuilding = (uid: string) => {
     const targetBld = state.buildings.find((b) => b.uid === uid);
     const bldDef = targetBld ? getBuildingDef(targetBld.typeId) : null;
+    if (targetBld?.damaged) {
+      setSelectedBuildingUid(uid);
+      setOpsModal('damage');
+      return;
+    }
     onServiceBuilding(uid);
     setSelectedBuildingUid(uid);
     triggerBusyDuty(
@@ -285,7 +358,7 @@ export default function MissionControl({
     onInspectStormFlue();
     triggerBusyDuty(
       'inspect_flue',
-      'Inspect Storm Flue',
+      'Purge Storm Flue',
       `Purging dust blockage (${state.stormFlue.cloggedPct}% → 0%) & balancing flue pressure`
     );
   };
@@ -308,9 +381,14 @@ export default function MissionControl({
     );
   };
 
+  const cycleCameraMode = () => {
+    setCameraMode((prev) =>
+      prev === 'follow' ? 'overview' : prev === 'overview' ? 'first_person' : 'follow'
+    );
+  };
+
   return (
     <div className="relative w-full h-screen overflow-hidden bg-[#05070C] text-slate-100">
-      {/* Full-Viewport Interactive 3D Canvas (Outpost 3D or Astronaut 3D View) */}
       {sceneMode === 'astronaut' ? (
         <AstronautView
           state={state}
@@ -325,34 +403,47 @@ export default function MissionControl({
           state={state}
           cameraMode={cameraMode}
           onProximityChange={setNearbyTarget}
+          onBoundaryWarning={setNearBoundary}
+          onPositionUpdate={setMapPositions}
           onSelectAstronaut={onSelectAstronaut}
           onSelectBuilding={handleSelectAndInspectBuilding}
           onServiceBuilding={handleServiceAndSelectBuilding}
-          onInteractStormFlue={handleInspectFlueWithDuty}
+          onInteractStormFlue={() => setOpsModal('flue')}
+          onInteractSpaceship={() => setOpsModal('fuel')}
           onCollectDataNode={handleCollectNodeWithDuty}
           onFieldWork={handleFieldWorkDuty}
           interactRef={interactRef}
+          jumpRef={jumpRef}
         />
       )}
 
-      {/* CSS Hand-Movement & Simulation-Day Busy Task Animation View */}
       <TaskAnimationView
         duty={busyDuty}
         hudHidden={hudHidden}
         onDismiss={() => setBusyDuty(null)}
       />
 
-      {/* Top Compact Telemetry & World Deployment Header (Solid translucent, zero backdrop-blur) */}
+      {/* First-person visor frame overlay (non-blurring) */}
+      {sceneMode === 'outpost' && cameraMode === 'first_person' && (
+        <div className="pointer-events-none fixed inset-0 z-10">
+          <div className="absolute inset-5 border border-sky-400/20 rounded-2xl" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center">
+            <span className="w-3 h-[1px] bg-sky-300/80" />
+            <span className="absolute h-3 w-[1px] bg-sky-300/80" />
+          </div>
+        </div>
+      )}
+
+      {/* Top Header */}
       <header className="absolute top-0 inset-x-0 z-20 bg-[#0F1623]/94 border-b border-slate-800 px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <Rocket className="w-4 h-4 text-sky-400" />
             <span className="font-display font-bold text-white tracking-wider text-sm">
               ASTRA 3D
             </span>
           </div>
 
-          {/* 3D Scene Mode Segmented Control */}
           <div className="flex items-center gap-1 bg-[#07090E] border border-slate-800 rounded-lg p-0.5">
             <button
               type="button"
@@ -379,25 +470,27 @@ export default function MissionControl({
             </button>
           </div>
 
-          {/* Clean Compact World Switcher Dropdown */}
           <label className="flex items-center gap-1.5 bg-[#07090E] border border-slate-800 rounded-lg px-2 py-1 text-[11px] font-mono text-sky-300">
             <Globe className="w-3.5 h-3.5 text-sky-400 shrink-0" />
             <select
-              aria-label="Select NASA planetary outpost"
+              aria-label="Select planetary outpost"
               value={state.planetId}
-              onChange={(e) => onTravelToWorld(e.target.value as PlanetId)}
+              onChange={(e) => {
+                const dest = e.target.value as PlanetId;
+                if (dest !== state.planetId) setPendingTransitWorld(dest);
+              }}
               className="bg-transparent text-slate-100 focus:outline-none cursor-pointer pr-1"
             >
-              {PLANETS.map((planet) => (
-                <option key={planet.id} value={planet.id} className="bg-[#0F1623] text-slate-100">
-                  {planet.name}
+              {PLANETS.map((p) => (
+                <option key={p.id} value={p.id} className="bg-[#0F1623] text-slate-100">
+                  {p.name} ({p.gravityMs2} m/s²)
                 </option>
               ))}
             </select>
           </label>
         </div>
 
-        {/* Streamlined 5 Core Vitals Strip */}
+        {/* Core Vitals Pills (Clicking opens diagnostics only — never completes tasks) */}
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono tabular-nums">
           <button
             type="button"
@@ -439,8 +532,20 @@ export default function MissionControl({
           </button>
           <button
             type="button"
-            onClick={handleInspectFlueWithDuty}
-            title="Storm Flue Clog Status — Click to inspect & clear"
+            onClick={() => setOpsModal('fuel')}
+            title="Open Propellant & Starship Fuel Console"
+            className={`px-2 py-1 rounded bg-[#07090E] border flex items-center gap-1 ${toneClass(
+              state.fuel.shipTankPct,
+              45,
+              25
+            )}`}
+          >
+            <Fuel className="w-3 h-3" /> Fuel {state.fuel.shipTankPct}%
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpsModal('flue')}
+            title="Inspect Storm Flue Telemetry"
             className={`px-2 py-1 rounded bg-[#07090E] border flex items-center gap-1 ${
               state.stormFlue.status === 'critical'
                 ? 'border-rose-500 text-rose-300'
@@ -453,16 +558,20 @@ export default function MissionControl({
           </button>
         </div>
 
-        {/* Day & Essential Controls */}
+        {/* Day & Audio / Pause / Exit */}
         <div className="flex items-center gap-1.5 text-xs font-mono tabular-nums shrink-0">
           <span className="px-2.5 py-1 rounded bg-[#07090E] border border-slate-700 text-white">
             Day {String(state.day).padStart(2, '0')}/{state.maxDays}
           </span>
+          {state.lunarState.eclipseActive && (
+            <span className="px-2 py-1 rounded bg-amber-950 border border-amber-400 text-amber-200 text-[10px]">
+              ECLIPSE
+            </span>
+          )}
           <button
             type="button"
             onClick={onToggleAudio}
-            title={isAudioMuted ? 'Unmute NASA Voice & Audio' : 'Mute NASA Voice & Audio'}
-            aria-label={isAudioMuted ? 'Unmute NASA Voice & Audio' : 'Mute NASA Voice & Audio'}
+            aria-label={isAudioMuted ? 'Unmute Audio' : 'Mute Audio'}
             className="p-1.5 rounded bg-[#07090E] border border-slate-700 hover:border-sky-400 text-slate-300"
           >
             {isAudioMuted ? (
@@ -474,7 +583,6 @@ export default function MissionControl({
           <button
             type="button"
             onClick={() => setPaused((p) => !p)}
-            title={paused ? 'Resume Simulation' : 'Pause Simulation'}
             aria-label={paused ? 'Resume Simulation' : 'Pause Simulation'}
             className="p-1.5 rounded bg-[#07090E] border border-slate-700 hover:border-sky-400 text-slate-300"
           >
@@ -487,7 +595,6 @@ export default function MissionControl({
           <button
             type="button"
             onClick={onExitMission}
-            title="Exit Mission"
             aria-label="Exit Mission"
             className="p-1.5 rounded bg-[#07090E] border border-slate-700 hover:border-rose-400 text-slate-300 hover:text-rose-400"
           >
@@ -496,75 +603,112 @@ export default function MissionControl({
         </div>
       </header>
 
-      {/* Slim Non-Blocking Emergency or Female NASA Capcom Voice Strip */}
-      {state.activeEvent ? (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 w-[min(92vw,680px)] rounded-xl bg-rose-950/95 border border-rose-500 px-3.5 py-2.5 flex items-center justify-between gap-3 shadow-xl">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-            <div className="min-w-0">
-              <div className="font-mono text-[10px] uppercase text-rose-300">
-                Emergency Alert · Day {state.day}
-              </div>
-              <div className="font-display font-bold text-sm text-white truncate">
-                {state.activeEvent.title}
-              </div>
-            </div>
+      {/* Alerts / Boundary / Refuge / Capcom Strip */}
+      <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5 w-[min(92vw,700px)] pointer-events-none">
+        {nearBoundary && (
+          <div className="px-3 py-1 rounded-lg bg-amber-950/95 border border-amber-400 text-xs font-mono text-amber-200 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            Outpost Roaming Perimeter (R={ROAMING_RADIUS}m) Reached — Clamped Safely
           </div>
-          <button
-            type="button"
-            onClick={onOpenEmergency}
-            className="px-3.5 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-slate-950 font-display font-bold text-xs whitespace-nowrap shrink-0"
-          >
-            Resolve
-          </button>
-        </div>
-      ) : (
-        capcomBanner && (
-          <div
-            className={`absolute top-14 left-1/2 -translate-x-1/2 z-20 w-[min(92vw,680px)] rounded-xl border px-3.5 py-2 flex items-center justify-between gap-3 shadow-xl ${
-              capcomBanner.severity === 'danger'
-                ? 'bg-rose-950/95 border-rose-500 text-rose-100'
-                : capcomBanner.severity === 'warning'
-                ? 'bg-amber-950/95 border-amber-500 text-amber-100'
-                : 'bg-[#0F1623]/94 border-sky-500/50 text-slate-100'
-            }`}
-          >
+        )}
+
+        {state.shelterRefugeActive && (
+          <div className="pointer-events-auto w-full rounded-xl bg-amber-950/95 border border-amber-500 px-3.5 py-2 flex items-center justify-between gap-2 text-xs">
+            <span className="text-amber-100 flex items-center gap-2">
+              <Shield className="w-4 h-4 text-amber-400 shrink-0" />
+              <strong>Emergency Shelter Refuge Active:</strong> Crew protected inside Habitat &amp;
+              Starship airlocks.
+            </span>
+            <button
+              type="button"
+              onClick={onToggleShelterRefuge}
+              className="px-2.5 py-1 rounded bg-amber-500 text-slate-950 font-bold shrink-0"
+            >
+              Exit Shelter
+            </button>
+          </div>
+        )}
+
+        {state.activeEvent ? (
+          <div className="pointer-events-auto w-full rounded-xl bg-rose-950/95 border border-rose-500 px-3.5 py-2.5 flex items-center justify-between gap-3 shadow-xl">
             <div className="flex items-center gap-2.5 min-w-0">
-              <Radio
-                className={`w-4 h-4 shrink-0 ${
-                  capcomBanner.severity === 'danger'
-                    ? 'text-rose-400'
-                    : capcomBanner.severity === 'warning'
-                    ? 'text-amber-400'
-                    : 'text-sky-400'
-                }`}
-              />
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
               <div className="min-w-0">
-                <div className="font-mono text-[10px] uppercase tracking-wider opacity-85 truncate">
-                  {capcomBanner.title}
+                <div className="font-mono text-[10px] uppercase text-rose-300">
+                  Emergency Alert · Day {state.day}
                 </div>
-                <div className="text-xs leading-snug line-clamp-2">{capcomBanner.text}</div>
+                <div className="font-display font-bold text-sm text-white truncate">
+                  {state.activeEvent.title}
+                </div>
               </div>
             </div>
             <button
               type="button"
-              onClick={() => setCapcomBanner(null)}
-              aria-label="Dismiss NASA voice banner"
-              className="p-1 text-slate-400 hover:text-white shrink-0"
+              onClick={onOpenEmergency}
+              className="px-3.5 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-slate-950 font-display font-bold text-xs whitespace-nowrap shrink-0"
             >
-              <X className="w-4 h-4" />
+              Resolve
             </button>
           </div>
-        )
+        ) : (
+          capcomBanner && (
+            <div
+              className={`pointer-events-auto w-full rounded-xl border px-3.5 py-2 flex items-center justify-between gap-3 shadow-xl ${
+                capcomBanner.severity === 'danger'
+                  ? 'bg-rose-950/95 border-rose-500 text-rose-100'
+                  : capcomBanner.severity === 'warning'
+                  ? 'bg-amber-950/95 border-amber-500 text-amber-100'
+                  : 'bg-[#0F1623]/94 border-sky-500/50 text-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Radio
+                  className={`w-4 h-4 shrink-0 ${
+                    capcomBanner.severity === 'danger'
+                      ? 'text-rose-400'
+                      : capcomBanner.severity === 'warning'
+                      ? 'text-amber-400'
+                      : 'text-sky-400'
+                  }`}
+                />
+                <div className="min-w-0">
+                  <div className="font-mono text-[10px] uppercase tracking-wider opacity-85 truncate">
+                    {capcomBanner.title}
+                  </div>
+                  <div className="text-xs leading-snug line-clamp-2">{capcomBanner.text}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCapcomBanner(null)}
+                aria-label="Dismiss voice banner"
+                className="p-1 text-slate-400 hover:text-white shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )
+        )}
+      </div>
+
+      {/* Top-Right Tactical Minimap (hidden when building inspector open) */}
+      {!hudHidden && sceneMode === 'outpost' && !selectedBuilding && (
+        <div className="hidden md:block absolute top-16 right-4 z-10">
+          <TacticalMinimap
+            state={state}
+            positions={mapPositions}
+            onSelectAstronaut={onSelectAstronaut}
+          />
+        </div>
       )}
 
-      {/* Selected Building Floating Inspector (only shown when a 3D module is clicked) */}
+      {/* Selected Building Inspector */}
       {selectedBuilding && selectedBuildingDef && (
         <div className="absolute top-16 right-4 z-20 w-80 rounded-xl bg-[#0F1623]/95 border border-slate-700 p-4 shadow-2xl">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div>
               <div className="text-[10px] font-mono uppercase text-sky-400">
-                3D Module Selected
+                3D Module Selected · {Math.round(selectedBuilding.conditionPct)}% Integrity
               </div>
               <h3 className="font-display font-bold text-white text-base">
                 {selectedBuildingDef.name} (Lv {selectedBuilding.level})
@@ -581,15 +725,31 @@ export default function MissionControl({
           </div>
           <p className="text-xs text-slate-300 mb-3">{selectedBuildingDef.benefit}</p>
 
+          {selectedBuilding.damaged && (
+            <div className="mb-2.5 p-2 rounded bg-rose-950/60 border border-rose-500/50 text-xs text-rose-200">
+              Damaged: {selectedBuilding.damageCause} — Inspect &amp; repair in Repairs panel.
+            </div>
+          )}
+
           <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => handleServiceAndSelectBuilding(selectedBuilding.uid)}
-              className="w-full py-2 px-3 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5"
-            >
-              <Compass className="w-3.5 h-3.5" />
-              Run {activeAstronaut.name}&apos;s NASA Maintenance
-            </button>
+            {selectedBuilding.damaged ? (
+              <button
+                type="button"
+                onClick={() => setOpsModal('damage')}
+                className="w-full py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5"
+              >
+                <Wrench className="w-3.5 h-3.5" /> Inspect &amp; Repair Module
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleServiceAndSelectBuilding(selectedBuilding.uid)}
+                className="w-full py-2 px-3 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                Run {activeAstronaut.name}&apos;s Shift
+              </button>
+            )}
 
             <div className="flex items-center gap-2">
               {selectedBuilding.typeId !== 'habitat' && (
@@ -624,11 +784,11 @@ export default function MissionControl({
         </div>
       )}
 
-      {/* Nearby [E] Proximity Interaction Pill (Outpost 3D Mode) */}
+      {/* Proximity [E] Prompt */}
       {sceneMode === 'outpost' && nearbyTarget && (
         <div
           className={`absolute left-1/2 -translate-x-1/2 z-20 transition-all ${
-            hudHidden ? 'bottom-14' : 'bottom-44 sm:bottom-40'
+            hudHidden ? 'bottom-14' : 'bottom-48 sm:bottom-44'
           }`}
         >
           <button
@@ -649,10 +809,10 @@ export default function MissionControl({
         </div>
       )}
 
-      {/* HUD Collapse / Expand Button */}
+      {/* HUD Toggle */}
       <div
         className={`absolute right-4 z-20 transition-all ${
-          hudHidden ? 'bottom-3' : 'bottom-[154px] sm:bottom-[142px]'
+          hudHidden ? 'bottom-3' : 'bottom-[178px] sm:bottom-[154px]'
         }`}
       >
         <button
@@ -665,71 +825,40 @@ export default function MissionControl({
         </button>
       </div>
 
-      {/* Collapsible Bottom Mission & 6-Astronaut Control Dock */}
+      {/* Bottom Operations & Crew Dock */}
       {!hudHidden && (
         <footer className="absolute bottom-0 inset-x-0 z-20 bg-[#0F1623]/94 border-t border-slate-800 px-3 sm:px-5 py-2.5 flex flex-col gap-2">
-          {/* Row 1: 6-Astronaut Switcher + Active Astronaut NASA Work Card */}
+          {/* Row 1: 6 Astronauts + Camera + Jump + Rover Drive */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
               {ASTRONAUTS.map((astro) => {
                 const isSelected = state.activeAstronautId === astro.id;
                 const prog = state.crewProgress[astro.id];
+                const vitals = state.crewVitals[astro.id];
                 const isBusy = busyDuty?.astronautId === astro.id;
                 return (
                   <button
                     key={astro.id}
                     type="button"
                     onClick={() => onSelectAstronaut(astro.id)}
-                    className={`px-2.5 py-1.5 rounded-lg border text-xs flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
-                      isSelected
+                    className={`px-2 py-1.5 rounded-lg border text-xs flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
+                      vitals?.medicalAlert
+                        ? 'bg-rose-950/50 border-rose-500 text-rose-100'
+                        : isSelected
                         ? 'bg-sky-500/20 border-sky-400 text-white font-semibold'
                         : 'bg-[#07090E] border-slate-800 text-slate-300 hover:border-slate-600'
                     }`}
                   >
-                    <span className="relative w-5 h-5 flex items-center justify-center shrink-0">
-                      {isBusy && (
-                        <svg
-                          key={busyDuty.key}
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                          className="absolute inset-0 w-5 h-5 -rotate-90 pointer-events-none"
-                        >
-                          <circle
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            fill="none"
-                            stroke="rgba(148, 163, 184, 0.2)"
-                            strokeWidth="2"
-                          />
-                          <circle
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            fill="none"
-                            stroke={astro.suitColor}
-                            strokeWidth="2.2"
-                            strokeLinecap="round"
-                            style={{ '--ring-circumference': '62.83' } as React.CSSProperties}
-                            className="astra-progress-ring"
-                          />
-                        </svg>
-                      )}
-                      <span
-                        className={`w-3.5 h-3.5 rounded-full flex items-center justify-center border border-slate-700 ${
-                          isBusy ? 'astra-portrait-float' : ''
-                        }`}
-                        style={{ backgroundColor: `${astro.suitColor}26` }}
-                      >
-                        <User
-                          className="w-2.5 h-2.5"
-                          style={{ color: astro.suitColor }}
-                        />
-                      </span>
-                    </span>
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: astro.suitColor }}
+                    />
                     <span>{astro.name}</span>
+                    {vitals?.medicalAlert && (
+                      <span className="text-[10px] text-rose-400 font-bold">✚</span>
+                    )}
                     {isBusy ? (
-                      <span className="px-1 py-0.5 rounded bg-amber-400 text-slate-950 font-mono text-[9px] font-bold shrink-0">
+                      <span className="px-1 py-0.5 rounded bg-amber-400 text-slate-950 font-mono text-[9px] font-bold">
                         BUSY
                       </span>
                     ) : (
@@ -742,148 +871,135 @@ export default function MissionControl({
               })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              {/* Active Astronaut Portrait + Duty Progress Ring */}
-              <div className="px-2.5 py-1 rounded-lg bg-[#07090E] border border-slate-800 flex items-center gap-2.5 max-w-xl">
-                <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
-                  {isActiveBusy && busyDuty && (
-                    <svg
-                      key={busyDuty.key}
-                      viewBox="0 0 38 38"
-                      aria-hidden="true"
-                      className="absolute inset-0 w-9 h-9 -rotate-90 pointer-events-none"
-                    >
-                      <circle
-                        cx="19"
-                        cy="19"
-                        r="17"
-                        fill="none"
-                        stroke="rgba(148, 163, 184, 0.22)"
-                        strokeWidth="2.5"
-                      />
-                      <circle
-                        cx="19"
-                        cy="19"
-                        r="17"
-                        fill="none"
-                        stroke={activeAstronaut.suitColor}
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        style={{ '--ring-circumference': '106.81' } as React.CSSProperties}
-                        className="astra-progress-ring"
-                      />
-                    </svg>
-                  )}
-                  <div
-                    className={`w-7 h-7 rounded-full border flex items-center justify-center overflow-hidden ${
-                      isActiveBusy ? 'astra-portrait-float' : ''
-                    }`}
-                    style={{
-                      borderColor: isActiveBusy ? activeAstronaut.suitColor : '#334155',
-                      backgroundColor: '#0F1623',
-                    }}
-                    title={`${activeAstronaut.name} · ${activeAstronaut.role}`}
-                  >
-                    <svg
-                      viewBox="0 0 32 32"
-                      className="w-6 h-6"
-                      aria-label={`${activeAstronaut.name} portrait`}
-                    >
-                      {/* Helmet shell */}
-                      <circle cx="16" cy="14" r="9" fill="#E2E8F0" />
-                      {/* Gold reflective EVA visor */}
-                      <rect x="10.5" y="10.5" width="11" height="6.5" rx="3" fill="#F59E0B" />
-                      <path
-                        d="M12 12.2 C14 11.4, 17 11.4, 19.5 12.2"
-                        stroke="#FEF3C7"
-                        strokeWidth="1.2"
-                        strokeLinecap="round"
-                        fill="none"
-                      />
-                      {/* Suit collar & shoulders in astronaut accent color */}
-                      <path
-                        d="M6.5 29 C7.5 23.5, 11 21.5, 16 21.5 C21 21.5, 24.5 23.5, 25.5 29 Z"
-                        fill={activeAstronaut.suitColor}
-                      />
-                      <rect x="12" y="21" width="8" height="2.2" rx="1" fill="#0F1623" />
-                    </svg>
-                  </div>
-                </div>
-
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-white shrink-0">
-                      {activeAstronaut.name}
-                    </span>
-                    {isActiveBusy && busyDuty ? (
-                      <span
-                        className="text-[11px] font-mono font-semibold truncate"
-                        style={{ color: activeAstronaut.suitColor }}
-                      >
-                        · Day {busyDuty.day} Busy ({busyDuty.label})
-                      </span>
-                    ) : (
-                      <span className="text-slate-300 truncate">
-                        · {activeAstronaut.taskTitle}
-                      </span>
-                    )}
-                  </div>
-                  {activeProgress && (
-                    <div className="text-[11px] font-mono text-emerald-400 tabular-nums">
-                      {activeProgress.tasksCompleted} tasks done · {activeAstronaut.role}
-                    </div>
-                  )}
-                </div>
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <div className="px-2.5 py-1 rounded-lg bg-[#07090E] border border-slate-800 flex items-center gap-2">
+                <span className="font-semibold text-white">{activeAstronaut.name}</span>
+                <span className="text-[11px] font-mono text-emerald-400">
+                  {activeProgress?.tasksCompleted || 0} tasks
+                </span>
+                <span className="text-[11px] font-mono text-sky-300">
+                  g={planet.gravityMs2} m/s²
+                </span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => announceAstronautBriefing(activeAstronaut.id)}
-                title={`Replay NASA Task & Survival Briefing for ${activeAstronaut.name}`}
-                className="px-2.5 py-1 rounded bg-[#07090E] hover:bg-slate-800 border border-emerald-500/40 text-[11px] font-mono text-emerald-300 flex items-center gap-1 whitespace-nowrap shrink-0"
-              >
-                <Radio className="w-3 h-3" />
-                Brief
-              </button>
-
               {sceneMode === 'outpost' && (
-                <button
-                  type="button"
-                  onClick={() => setCameraMode((m) => (m === 'follow' ? 'overview' : 'follow'))}
-                  className="px-2.5 py-1 rounded bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-[11px] font-mono text-sky-300 flex items-center gap-1 whitespace-nowrap shrink-0"
-                >
-                  <Video className="w-3.5 h-3.5" />
-                  {cameraMode === 'follow' ? 'Follow Cam' : 'Overview Cam'}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => jumpRef.current?.()}
+                    className="px-2.5 py-1 rounded bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-[11px] font-mono text-cyan-300 flex items-center gap-1 whitespace-nowrap"
+                    title="Jump using planetary gravity [Space]"
+                  >
+                    <ArrowUp className="w-3 h-3" />
+                    Jump [Space]
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onToggleRoverDrive}
+                    disabled={state.rover.damaged}
+                    className={`px-2.5 py-1 rounded border text-[11px] font-mono flex items-center gap-1 whitespace-nowrap ${
+                      state.rover.manualControl
+                        ? 'bg-sky-500 text-slate-950 border-sky-400 font-bold'
+                        : 'bg-[#07090E] border-slate-700 text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    <Car className="w-3 h-3" />
+                    {state.rover.damaged
+                      ? 'Rover Damaged'
+                      : state.rover.manualControl
+                      ? 'Exit Rover'
+                      : 'Drive Rover'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cycleCameraMode}
+                    className="px-2.5 py-1 rounded bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-[11px] font-mono text-sky-300 flex items-center gap-1 whitespace-nowrap"
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    {cameraMode === 'follow'
+                      ? 'Follow Cam'
+                      : cameraMode === 'overview'
+                      ? 'Overview Cam'
+                      : '1st Person'}
+                  </button>
+                </>
               )}
             </div>
           </div>
 
-          {/* Row 2: Clean Mission Actions + Advance Day */}
+          {/* Row 2: Mission Systems Bar + Advance Day */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
-                onClick={handleInspectFlueWithDuty}
-                className="px-2.5 py-1.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-amber-500/40 text-xs font-medium text-amber-200 flex items-center gap-1.5"
+                onClick={() => setOpsModal('fuel')}
+                className="px-2.5 py-1.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-emerald-500/40 text-xs font-medium text-emerald-300 flex items-center gap-1.5"
               >
-                <Fan className="w-3.5 h-3.5 text-amber-400" />
-                Storm Flue ({state.stormFlue.cloggedPct}%)
+                <Fuel className="w-3.5 h-3.5" />
+                Fuel ({state.fuel.shipTankPct}%)
               </button>
-              {onTriggerStormScene && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    stopNasaSpeech();
-                    onTriggerStormScene();
-                  }}
-                  title="Preview Incoming Storm Animation Scene"
-                  className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/50 text-xs font-medium text-amber-200 flex items-center gap-1.5"
-                >
-                  <CloudLightning className="w-3.5 h-3.5 text-amber-400" />
-                  Storm Scene
-                </button>
-              )}
+
+              <button
+                type="button"
+                onClick={() => setOpsModal('medical')}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
+                  medicalAlertsCount > 0
+                    ? 'bg-rose-500/20 border-rose-500 text-rose-200 font-semibold'
+                    : 'bg-[#07090E] hover:bg-slate-800 border-slate-700 text-slate-200'
+                }`}
+              >
+                <HeartPulse className="w-3.5 h-3.5 text-rose-400" />
+                Medical {medicalAlertsCount > 0 ? `(${medicalAlertsCount})` : ''}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOpsModal('comms')}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
+                  state.comms.fault
+                    ? 'bg-amber-500/20 border-amber-500 text-amber-200 font-semibold'
+                    : 'bg-[#07090E] hover:bg-slate-800 border-slate-700 text-slate-200'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5 text-sky-400" />
+                Comms {state.comms.fault ? 'FAULT' : `${state.comms.signalStrengthPct}%`}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOpsModal('parts')}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
+                  lowPartsCount > 0
+                    ? 'bg-amber-500/15 border-amber-500/60 text-amber-200'
+                    : 'bg-[#07090E] hover:bg-slate-800 border-slate-700 text-slate-200'
+                }`}
+              >
+                <Package className="w-3.5 h-3.5 text-amber-400" />
+                Parts {lowPartsCount > 0 ? `(${lowPartsCount} Low)` : ''}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOpsModal('damage')}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
+                  damagedCount > 0
+                    ? 'bg-rose-500/20 border-rose-500 text-rose-200 font-semibold'
+                    : 'bg-[#07090E] hover:bg-slate-800 border-slate-700 text-slate-200'
+                }`}
+              >
+                <Wrench className="w-3.5 h-3.5 text-amber-400" />
+                Repairs {damagedCount > 0 ? `(${damagedCount})` : ''}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOpsModal('build_module')}
+                className="px-2.5 py-1.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-xs font-medium flex items-center gap-1.5"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
+                Build ({state.budget} CR)
+              </button>
+
               <button
                 type="button"
                 onClick={() => setActiveModal('telemetry')}
@@ -892,39 +1008,58 @@ export default function MissionControl({
                 <Activity className="w-3.5 h-3.5 text-sky-400" /> Telemetry ({collectedCount}/
                 {state.dataNodes.length})
               </button>
-              <button
-                type="button"
-                onClick={() => setActiveModal('resources')}
-                className="px-2.5 py-1.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-xs font-medium flex items-center gap-1.5"
-              >
-                <Sliders className="w-3.5 h-3.5 text-sky-400" /> Resources
-              </button>
+
               <button
                 type="button"
                 onClick={() => setActiveModal('research')}
                 className="px-2.5 py-1.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-xs font-medium flex items-center gap-1.5"
               >
-                <FlaskConical className="w-3.5 h-3.5 text-emerald-400" /> Research (
-                {state.sciencePoints})
+                <FlaskConical className="w-3.5 h-3.5 text-emerald-400" /> Lab ({state.sciencePoints})
               </button>
+
               <button
                 type="button"
-                onClick={onOpenEmergency}
-                className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
-                  state.activeEvent
-                    ? 'bg-rose-500/20 border-rose-500 text-rose-300'
-                    : 'bg-[#07090E] hover:bg-slate-800 border-slate-700 text-slate-300'
-                }`}
-              >
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Emergency
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveModal('objectives')}
+                onClick={() => setOpsModal('whatif')}
                 className="px-2.5 py-1.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-xs font-medium flex items-center gap-1.5"
               >
-                <Target className="w-3.5 h-3.5 text-sky-400" /> Objectives
+                <Sliders className="w-3.5 h-3.5 text-sky-400" /> What-If
               </button>
+
+              <button
+                type="button"
+                onClick={() => setOpsModal('achievements')}
+                className="px-2.5 py-1.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-xs font-medium flex items-center gap-1.5"
+              >
+                <Award className="w-3.5 h-3.5 text-amber-400" /> Honors
+              </button>
+
+              <button
+                type="button"
+                onClick={onToggleShelterRefuge}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
+                  state.shelterRefugeActive
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
+                    : 'bg-[#07090E] hover:bg-slate-800 border-slate-700 text-slate-200'
+                }`}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                {state.shelterRefugeActive ? 'Sheltered' : 'Refuge Drill'}
+              </button>
+
+              {onTriggerStormScene && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopNasaSpeech();
+                    onTriggerStormScene();
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/50 text-xs font-medium text-amber-200 flex items-center gap-1.5"
+                >
+                  <CloudLightning className="w-3.5 h-3.5 text-amber-400" />
+                  Storm Sim
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setAdvisorOpen(true)}
@@ -951,7 +1086,7 @@ export default function MissionControl({
         </footer>
       )}
 
-      {/* Clickable Resource Detail Modal (Solid dark backdrop, no backdrop-blur) */}
+      {/* Resource Diagnostics Modal */}
       {selectedResource && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
           <div className="max-w-md w-full rounded-xl bg-space-900 border border-slate-700 p-6 relative">
@@ -972,20 +1107,14 @@ export default function MissionControl({
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
                   <span className="text-slate-400">Current Reserve</span>
-                  <span className="font-mono tabular-nums font-bold text-white">
+                  <span className="font-mono font-bold text-white">
                     {state.resources.oxygen.current} / 100
                   </span>
                 </div>
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Daily Production</span>
-                  <span className="font-mono tabular-nums text-emerald-400">
-                    +{preview.oxygenProd}/day
-                  </span>
-                </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Crew Consumption</span>
-                  <span className="font-mono tabular-nums text-amber-400">
-                    -{preview.oxygenCons}/day
+                  <span className="text-slate-400">Production / Consumed</span>
+                  <span className="font-mono text-emerald-400">
+                    +{preview.oxygenProd} / -{preview.oxygenCons}
                   </span>
                 </div>
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
@@ -1005,24 +1134,18 @@ export default function MissionControl({
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
                   <span className="text-slate-400">Current Water Reserve</span>
-                  <span className="font-mono tabular-nums font-bold text-white">
+                  <span className="font-mono font-bold text-white">
                     {state.resources.water.current} / 100
                   </span>
                 </div>
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Recycling &amp; ISRU Gain</span>
-                  <span className="font-mono tabular-nums text-emerald-400">
-                    +{preview.waterProd}/day
+                  <span className="text-slate-400">Production / Demand</span>
+                  <span className="font-mono text-emerald-400">
+                    +{preview.waterProd} / -{preview.waterCons}
                   </span>
                 </div>
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Crew + Greenhouse Demand</span>
-                  <span className="font-mono tabular-nums text-amber-400">
-                    -{preview.waterCons}/day
-                  </span>
-                </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Expected Supply Duration</span>
+                  <span className="text-slate-400">Projected Duration</span>
                   <span className="font-mono text-sky-400">
                     {expectedDaysLeft(
                       state.resources.water.current,
@@ -1038,24 +1161,18 @@ export default function MissionControl({
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
                   <span className="text-slate-400">Food Rations</span>
-                  <span className="font-mono tabular-nums font-bold text-white">
+                  <span className="font-mono font-bold text-white">
                     {state.resources.food.current} / 100
                   </span>
                 </div>
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Greenhouse Yield</span>
-                  <span className="font-mono tabular-nums text-emerald-400">
-                    +{preview.foodProd}/day
+                  <span className="text-slate-400">Greenhouse Yield / Demand</span>
+                  <span className="font-mono text-emerald-400">
+                    +{preview.foodProd} / -{preview.foodCons}
                   </span>
                 </div>
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Crew Consumption</span>
-                  <span className="font-mono tabular-nums text-amber-400">
-                    -{preview.foodCons}/day
-                  </span>
-                </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Expected Supply Duration</span>
+                  <span className="text-slate-400">Projected Duration</span>
                   <span className="font-mono text-sky-400">
                     {expectedDaysLeft(
                       state.resources.food.current,
@@ -1071,73 +1188,19 @@ export default function MissionControl({
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
                   <span className="text-slate-400">Battery Storage</span>
-                  <span className="font-mono tabular-nums font-bold text-white">
+                  <span className="font-mono font-bold text-white">
                     {state.resources.battery.current} / {state.resources.battery.max} kWh
                   </span>
                 </div>
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Solar Generation Today</span>
-                  <span className="font-mono tabular-nums text-emerald-400">
-                    +{preview.powerGen} kWh
-                  </span>
-                </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Total Outpost Load</span>
-                  <span className="font-mono tabular-nums text-amber-400">
-                    -{preview.powerUsed} kWh
+                  <span className="text-slate-400">Solar Gen / Base Load</span>
+                  <span className="font-mono text-emerald-400">
+                    +{preview.powerGen} / -{preview.powerUsed} kWh
                   </span>
                 </div>
                 <div className="flex justify-between p-3 rounded-lg bg-space-950">
                   <span className="text-slate-400">Solar Condition</span>
                   <span className="font-mono text-sky-300">{preview.solarCondition}</span>
-                </div>
-              </div>
-            )}
-
-            {selectedResource === 'shielding' && (
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Radiation Mitigation</span>
-                  <span className="font-mono tabular-nums font-bold text-white">
-                    {state.resources.shielding}%
-                  </span>
-                </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Cumulative Crew Exposure</span>
-                  <span className="font-mono tabular-nums text-amber-400">
-                    {state.crew.radiationExposure}%
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300">
-                  Switch to Om or upgrade your Habitat / Radiation Shelter to keep cosmic &amp;
-                  Jovian exposure low.
-                </p>
-              </div>
-            )}
-
-            {selectedResource === 'crew' && (
-              <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Crew Safe</span>
-                  <span className="font-mono tabular-nums font-bold text-emerald-400">
-                    {state.crew.safe} / {state.crew.total} Astronauts
-                  </span>
-                </div>
-                <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                  {ASTRONAUTS.map((a) => (
-                    <div
-                      key={a.id}
-                      className="p-2.5 rounded-lg bg-space-950 border border-slate-800 flex items-center justify-between text-xs"
-                    >
-                      <div>
-                        <span className="font-semibold text-white">{a.name}</span>
-                        <span className="text-slate-400 block">{a.role}</span>
-                      </div>
-                      <span className="font-mono text-sky-400">
-                        {state.crewProgress[a.id]?.tasksCompleted || 0} tasks
-                      </span>
-                    </div>
-                  ))}
                 </div>
               </div>
             )}
@@ -1155,7 +1218,7 @@ export default function MissionControl({
         </div>
       )}
 
-      {/* Telemetry / Research / Resources / Objectives Modal */}
+      {/* Telemetry / Research Modal */}
       {activeModal && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
           <div className="max-w-2xl w-full rounded-xl bg-space-900 border border-slate-700 p-6 relative max-h-[85vh] overflow-y-auto">
@@ -1175,7 +1238,7 @@ export default function MissionControl({
                     {state.planetName} · Telemetry &amp; Planetary Data
                   </div>
                   <h3 className="font-display text-2xl font-bold text-white">
-                    Mission Trends, Storm Flue &amp; Surface Samples
+                    Mission Trends, Data Nodes &amp; Event Log
                   </h3>
                 </div>
 
@@ -1295,100 +1358,52 @@ export default function MissionControl({
                 </div>
               </>
             )}
-
-            {activeModal === 'resources' && (
-              <>
-                <div className="text-xs font-mono text-sky-400 mb-1">Daily Net Balance</div>
-                <h3 className="font-display text-2xl font-bold text-white mb-4">
-                  Outpost Resource Flow
-                </h3>
-                <div className="space-y-2.5 text-sm font-mono tabular-nums">
-                  <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                    <span>Oxygen Net/Day</span>
-                    <span
-                      className={
-                        preview.oxygenProd - preview.oxygenCons >= 0
-                          ? 'text-emerald-400'
-                          : 'text-amber-400'
-                      }
-                    >
-                      {(preview.oxygenProd - preview.oxygenCons).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                    <span>Water Net/Day</span>
-                    <span
-                      className={
-                        preview.waterProd - preview.waterCons >= 0
-                          ? 'text-emerald-400'
-                          : 'text-amber-400'
-                      }
-                    >
-                      {(preview.waterProd - preview.waterCons).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                    <span>Food Net/Day</span>
-                    <span
-                      className={
-                        preview.foodProd - preview.foodCons >= 0
-                          ? 'text-emerald-400'
-                          : 'text-amber-400'
-                      }
-                    >
-                      {(preview.foodProd - preview.foodCons).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                    <span>Power Net/Day</span>
-                    <span
-                      className={
-                        preview.powerGen - preview.powerUsed >= 0
-                          ? 'text-emerald-400'
-                          : 'text-rose-400'
-                      }
-                    >
-                      {preview.powerGen - preview.powerUsed} kWh
-                    </span>
-                  </div>
-                </div>
-                <p className="text-xs text-slate-400 mt-4">
-                  Tip: Click any 3D module on the landing pad to toggle Standby or run an
-                  astronaut&apos;s NASA maintenance task.
-                </p>
-              </>
-            )}
-
-            {activeModal === 'objectives' && (
-              <>
-                <div className="text-xs font-mono text-sky-400 mb-1">NASA Mission Checklist</div>
-                <h3 className="font-display text-2xl font-bold text-white mb-4">
-                  {state.operationName} Objectives
-                </h3>
-                <ul className="space-y-2.5 text-sm text-slate-300">
-                  <li>
-                    · Survive until Day {state.maxDays} (Currently Day {state.day})
-                  </li>
-                  <li>
-                    · Keep all {state.crew.total} astronauts safe (Currently {state.crew.safe}/
-                    {state.crew.total})
-                  </li>
-                  <li>· Keep Storm Flue clogs below 65% (Currently {state.stormFlue.cloggedPct}%)</li>
-                  <li>
-                    · Collect Planetary Data Nodes on {state.planetName} ({collectedCount}/
-                    {state.dataNodes.length})
-                  </li>
-                  <li>
-                    · Deploy across NASA worlds ({state.visitedWorlds.length}/4 worlds visited)
-                  </li>
-                  <li>
-                    · Keep Radiation Exposure below 100% ({state.crew.radiationExposure}%)
-                  </li>
-                </ul>
-              </>
-            )}
           </div>
         </div>
+      )}
+
+      {/* Specialized Engineering Operations & Transit Confirmation Modals */}
+      <OperationsModals
+        openModal={opsModal}
+        state={state}
+        pendingTransitWorld={pendingTransitWorld}
+        onClose={() => setOpsModal(null)}
+        onCancelTransit={() => setPendingTransitWorld(null)}
+        onConfirmTransit={(dest) => {
+          setPendingTransitWorld(null);
+          onTravelToWorld(dest);
+        }}
+        onSynthesizeFuel={onSynthesizeFuel}
+        onRefuelStarship={onRefuelStarship}
+        onDiagnoseCrew={onDiagnoseCrew}
+        onTreatCrew={onTreatCrew}
+        onCommsStep={onCommsStep}
+        onCraftPart={onCraftPart}
+        onRecycleScrap={onRecycleScrap}
+        onOrderResupply={onOrderResupply}
+        onInspectBuildingDamage={onInspectBuildingDamage}
+        onRepairBuilding={onRepairBuilding}
+        onCleanDust={onCleanDust}
+        onRepairRover={onRepairRover}
+        onRechargeRover={onRechargeRover}
+        onPurgeFlue={handleInspectFlueWithDuty}
+        onConstructBuilding={onConstructBuilding}
+        onOpenMiniGame={(kind, title, onWin) =>
+          setMiniGameState({ kind, title, onWin })
+        }
+      />
+
+      {miniGameState && (
+        <EngineeringMiniGameModal
+          kind={miniGameState.kind}
+          title={miniGameState.title}
+          onClose={() => setMiniGameState(null)}
+          onSuccess={() => {
+            const winFn = miniGameState.onWin;
+            setMiniGameState(null);
+            winFn();
+          }}
+        />
       )}
 
       {advisorOpen && (

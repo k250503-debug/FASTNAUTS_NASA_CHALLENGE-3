@@ -2,19 +2,34 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { Compass, Database, Eye, Fan, Globe, RotateCcw, User, Video } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowUp,
+  Database,
+  Eye,
+  Fan,
+  Globe,
+  RotateCcw,
+  User,
+  Video,
+} from 'lucide-react';
 import { ASTRONAUTS, getAstronautById } from '../data/astronauts';
 import { getPlanetById } from '../data/planets';
+import { LANDED_SHIP_YAW } from '../three/MissionLaunchScene';
 import {
   createAstronautMesh,
   createContactShadowTexture,
   createDataNodeMesh,
   createNasaSpaceshipMesh,
+  createPlantedFlagMesh,
   createStormFlueMesh,
 } from '../three/models';
 import {
+  ROAMING_RADIUS,
   createTerrainAndSkyGroup,
   getPlanetEnvironmentSpec,
+  getWorldRockColliders,
+  getWorldZoneFeatures,
   groundHeightAt,
 } from '../three/terrain';
 import type { AstronautId, MissionState, PlanetId, SuitPartId } from '../types';
@@ -63,7 +78,6 @@ const SUIT_PART_META: Record<
   },
 };
 
-// Pre-allocated math helpers outside render loop (zero GC pressure)
 const _forward = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _moveDir = new THREE.Vector3();
@@ -87,7 +101,7 @@ const STAGE_SLOTS: Array<{ x: number; z: number; yaw: number }> = [
 
 const FLUE_POS = { x: -3.2, z: -2.8 };
 const SAMPLE_POS = { x: 3.2, z: -2.6 };
-const SPACESHIP_POS = { x: 7.4, z: -5.4 };
+const SPACESHIP_POS = { x: 8.6, z: -5.4 };
 
 function detectSoftwareWebGL(): boolean {
   try {
@@ -133,25 +147,6 @@ function findHitUserData(
   return { astronautId, suitPart, interactType };
 }
 
-function disposeObjectTree(root: THREE.Object3D, sharedTex?: THREE.Texture) {
-  root.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-    if (mesh.geometry) {
-      mesh.geometry.dispose();
-    }
-    if (mesh.material) {
-      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      mats.forEach((m) => {
-        const std = m as THREE.MeshStandardMaterial;
-        if (std.map && std.map !== sharedTex) {
-          std.map.dispose();
-        }
-        m.dispose();
-      });
-    }
-  });
-}
-
 export default function AstronautView({
   state,
   hudHidden = false,
@@ -166,6 +161,7 @@ export default function AstronautView({
   const [cameraMode, setCameraMode] = useState<AstronautCameraMode>('orbit');
   const [webglFailed, setWebglFailed] = useState(false);
   const [hoveredInfo, setHoveredInfo] = useState<string | null>(null);
+  const [nearBoundary, setNearBoundary] = useState(false);
   const [diagnosticBanner, setDiagnosticBanner] = useState<{
     title: string;
     detail: string;
@@ -202,6 +198,7 @@ export default function AstronautView({
   const syncWorldRef = useRef<((worldId: PlanetId) => void) | null>(null);
   const focusSelectedRef = useRef<((id: AstronautId, resetCam?: boolean) => void) | null>(null);
   const applyCameraModeRef = useRef<((mode: AstronautCameraMode) => void) | null>(null);
+  const triggerJumpRef = useRef<(() => void) | null>(null);
   const triggerDiagnosticRef = useRef<
     ((kind: DiagnosticKind, astronautId?: AstronautId) => void) | null
   >(null);
@@ -255,26 +252,24 @@ export default function AstronautView({
       46,
       (container.clientWidth || 800) / (container.clientHeight || 600),
       0.2,
-      200
+      240
     );
     camera.position.set(2.8, 3.1, 6.2);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = !isSoftwareGl;
     controls.dampingFactor = 0.08;
-    controls.maxPolarAngle = Math.PI * 0.47;
+    controls.maxPolarAngle = Math.PI * 0.465;
     controls.minDistance = 2.6;
-    controls.maxDistance = 18;
+    controls.maxDistance = 22;
     controls.target.set(0, 1.05, 0.4);
 
-    // Mandatory Studio Reflection Environment (RoomEnvironment)
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     const roomEnv = new RoomEnvironment();
     const envRT = pmremGenerator.fromScene(roomEnv, 0.04);
     scene.environment = envRT.texture;
     pmremGenerator.dispose();
 
-    // 3-Point + Hemisphere Lighting Rig
     const hemiLight = new THREE.HemisphereLight(
       initialSpec.hemiSkyColor,
       initialSpec.hemiGroundColor,
@@ -289,10 +284,10 @@ export default function AstronautView({
     keyLight.shadow.mapSize.height = isSoftwareGl ? 1024 : 2048;
     keyLight.shadow.camera.near = 1;
     keyLight.shadow.camera.far = 45;
-    keyLight.shadow.camera.left = -12;
-    keyLight.shadow.camera.right = 12;
-    keyLight.shadow.camera.top = 12;
-    keyLight.shadow.camera.bottom = -12;
+    keyLight.shadow.camera.left = -14;
+    keyLight.shadow.camera.right = 14;
+    keyLight.shadow.camera.top = 14;
+    keyLight.shadow.camera.bottom = -14;
     keyLight.shadow.bias = -0.0004;
     keyLight.shadow.normalBias = 0.02;
     scene.add(keyLight);
@@ -304,19 +299,33 @@ export default function AstronautView({
     const maxAnisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
     const shadowTex = createContactShadowTexture();
 
-    // Planetary Terrain & Sky Backdrop
     const worldGroup = new THREE.Group();
     scene.add(worldGroup);
-    let terrainCleanup: (() => void) | null = null;
+    let currentTerrainBundle: ReturnType<typeof createTerrainAndSkyGroup> | null = null;
     let renderedWorldId: PlanetId | null = null;
+    let currentRockColliders = getWorldRockColliders(worldIdRef.current);
+    let currentZoneFeatures = getWorldZoneFeatures(worldIdRef.current);
+
+    const plantedFlagMesh = createPlantedFlagMesh(shadowTex, maxAnisotropy);
+    scene.add(plantedFlagMesh);
+
+    const syncFlag = (planetId: PlanetId) => {
+      const f = stateRef.current.flagsByWorld[planetId];
+      if (f?.planted) {
+        plantedFlagMesh.visible = true;
+        plantedFlagMesh.position.set(f.x, groundHeightAt(planetId, f.x, f.z), f.z);
+      } else {
+        plantedFlagMesh.visible = false;
+      }
+    };
 
     const syncWorld = (planetId: PlanetId) => {
       if (renderedWorldId === planetId) return;
       renderedWorldId = planetId;
 
-      if (terrainCleanup) {
-        terrainCleanup();
-        terrainCleanup = null;
+      if (currentTerrainBundle) {
+        currentTerrainBundle.dispose();
+        currentTerrainBundle = null;
       }
       while (worldGroup.children.length > 0) {
         worldGroup.remove(worldGroup.children[0]);
@@ -331,12 +340,13 @@ export default function AstronautView({
       keyLight.color.setHex(spec.sunColor);
       keyLight.intensity = spec.sunIntensity;
 
-      const { group, dispose } = createTerrainAndSkyGroup(planetId, maxAnisotropy);
-      worldGroup.add(group);
-      terrainCleanup = dispose;
+      currentTerrainBundle = createTerrainAndSkyGroup(planetId, maxAnisotropy);
+      worldGroup.add(currentTerrainBundle.group);
+      currentRockColliders = getWorldRockColliders(planetId);
+      currentZoneFeatures = getWorldZoneFeatures(planetId);
+      syncFlag(planetId);
     };
 
-    // Interactive Storm Flue Vent & Planetary Data Sample Node
     const stormFlueGroup = createStormFlueMesh(shadowTex);
     stormFlueGroup.position.set(FLUE_POS.x, 0, FLUE_POS.z);
     stormFlueGroup.scale.setScalar(0.85);
@@ -348,18 +358,16 @@ export default function AstronautView({
     dataSampleGroup.userData.interactType = 'data_node';
     scene.add(dataSampleGroup);
 
-    // NASA Expedition Spaceship with Pakistan Flag near crew work area
     const spaceshipGroup = createNasaSpaceshipMesh(shadowTex, maxAnisotropy);
     spaceshipGroup.position.set(
       SPACESHIP_POS.x,
       groundHeightAt(worldIdRef.current, SPACESHIP_POS.x, SPACESHIP_POS.z),
       SPACESHIP_POS.z
     );
-    spaceshipGroup.scale.setScalar(0.86);
-    spaceshipGroup.rotation.y = -0.68;
+    spaceshipGroup.scale.setScalar(0.88);
+    spaceshipGroup.rotation.y = LANDED_SHIP_YAW;
     scene.add(spaceshipGroup);
 
-    // 6 Articulated Astronauts (Sub-part picking enabled via includeHitCylinder = false)
     const crewGroup = new THREE.Group();
     scene.add(crewGroup);
 
@@ -375,6 +383,9 @@ export default function AstronautView({
         x: slot.x,
         z: slot.z,
         yaw: slot.yaw,
+        airOffset: 0,
+        vy: 0,
+        grounded: true,
         walkPhase: idx * 0.9,
       };
     });
@@ -422,7 +433,7 @@ export default function AstronautView({
           title: `${astro.name} · ${displayNode?.label || 'Data Node'} Scan`,
           detail: uncollected
             ? `Spectrometer logged ${uncollected.reading} (+${uncollected.scienceValue} SCI).`
-            : `Node already archived — running telemetry verification sweep.`,
+            : 'Node already archived — running telemetry verification sweep.',
         });
       } else {
         const meta = SUIT_PART_META[kind];
@@ -452,7 +463,14 @@ export default function AstronautView({
 
     triggerDiagnosticRef.current = runDiagnosticAction;
 
-    // Smooth camera state (Orbit, Third-Person Chase, and First-Person Visor POV)
+    triggerJumpRef.current = () => {
+      const active = astroEntries.find((e) => e.profile.id === stateRef.current.activeAstronautId);
+      if (active && active.grounded) {
+        active.vy = 3.35;
+        active.grounded = false;
+      }
+    };
+
     let isGliding = false;
     const glideTarget = new THREE.Vector3(0, 1.05, 0.4);
     const glideCamOffset = new THREE.Vector3(2.8, 2.05, 5.8);
@@ -464,7 +482,7 @@ export default function AstronautView({
     const focusSelected = (id: AstronautId, resetCam = false) => {
       const found = astroEntries.find((e) => e.profile.id === id);
       if (!found) return;
-      const gy = groundHeightAt(worldIdRef.current, found.x, found.z);
+      const gy = groundHeightAt(worldIdRef.current, found.x, found.z) + found.airOffset;
       const mode = cameraModeRef.current;
 
       if (mode === 'first_person') {
@@ -527,7 +545,7 @@ export default function AstronautView({
       } else {
         controls.enabled = true;
         controls.minDistance = 2.6;
-        controls.maxDistance = 18;
+        controls.maxDistance = 22;
       }
 
       focusSelected(stateRef.current.activeAstronautId, true);
@@ -544,30 +562,26 @@ export default function AstronautView({
     focusSelectedRef.current = focusSelected;
     applyCameraModeRef.current = applyCameraMode;
 
-    // Pre-compile shaders on hardware GPUs
-    if (!isSoftwareGl) {
-      renderer.compile(scene, camera);
-    }
+    if (!isSoftwareGl) renderer.compile(scene, camera);
 
-    // Keyboard WASD/Arrow movement & [E] Hand-Work action for active astronaut
     const keys = new Set<string>();
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       keys.add(e.code);
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        triggerJumpRef.current?.();
+      }
       if (e.code === 'KeyE' && !e.repeat) {
         const curActive =
           astroEntries.find((ent) => ent.profile.id === stateRef.current.activeAstronautId) ||
           astroEntries[0];
         const flueDist = Math.hypot(curActive.x - FLUE_POS.x, curActive.z - FLUE_POS.z);
         const sampleDist = Math.hypot(curActive.x - SAMPLE_POS.x, curActive.z - SAMPLE_POS.z);
-        if (flueDist < 3.8) {
-          runDiagnosticAction('storm_flue', curActive.profile.id);
-        } else if (sampleDist < 3.8) {
-          runDiagnosticAction('data_node', curActive.profile.id);
-        } else {
-          runDiagnosticAction('arms_tools', curActive.profile.id);
-        }
+        if (flueDist < 3.8) runDiagnosticAction('storm_flue', curActive.profile.id);
+        else if (sampleDist < 3.8) runDiagnosticAction('data_node', curActive.profile.id);
+        else runDiagnosticAction('arms_tools', curActive.profile.id);
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -576,7 +590,6 @@ export default function AstronautView({
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
-    // Raycast clicking & throttled hover on suit parts, storm flue, and data sample
     const raycaster = new THREE.Raycaster();
     let pointerDownPos = { x: 0, y: 0 };
     let lastHoverCheck = 0;
@@ -695,12 +708,12 @@ export default function AstronautView({
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(container);
 
-    // Context loss & recovery safety
     let disposed = false;
     let contextLost = false;
     let frameId = 0;
     let lastTime = performance.now();
     let elapsed = 0;
+    let lastBoundaryAlert = false;
 
     const onContextLost = (e: Event) => {
       e.preventDefault();
@@ -728,9 +741,8 @@ export default function AstronautView({
               return;
             }
             const status = gl.getSyncParameter(sync, gl.SYNC_STATUS);
-            if (status === gl.UNSIGNALED) {
-              frameId = window.setTimeout(poll, 5);
-            } else {
+            if (status === gl.UNSIGNALED) frameId = window.setTimeout(poll, 5);
+            else {
               gl.deleteSync(sync);
               frameId = window.setTimeout(cb, 80);
             }
@@ -744,11 +756,47 @@ export default function AstronautView({
 
     const scheduleNextTick = () => {
       if (disposed || contextLost) return;
-      if (isSoftwareGl) {
-        afterDraw(tick);
-      } else {
-        frameId = requestAnimationFrame(tick);
+      if (isSoftwareGl) afterDraw(tick);
+      else frameId = requestAnimationFrame(tick);
+    };
+
+    const resolveCollisionsAndPerimeter = (x: number, z: number): { x: number; z: number; hitEdge: boolean } => {
+      let nx = x;
+      let nz = z;
+      const pushCircle = (cx: number, cz: number, minDist: number) => {
+        const dx = nx - cx;
+        const dz = nz - cz;
+        const d = Math.hypot(dx, dz);
+        if (d < minDist) {
+          if (d > 0.001) {
+            const p = minDist - d;
+            nx += (dx / d) * p;
+            nz += (dz / d) * p;
+          } else {
+            nx += minDist;
+          }
+        }
+      };
+
+      pushCircle(FLUE_POS.x, FLUE_POS.z, 1.55);
+      pushCircle(SAMPLE_POS.x, SAMPLE_POS.z, 1.15);
+      pushCircle(SPACESHIP_POS.x, SPACESHIP_POS.z, 2.7);
+      for (const rk of currentRockColliders) pushCircle(rk.x, rk.z, rk.radius + 0.42);
+      for (const zf of currentZoneFeatures) {
+        if (zf.kind === 'methane_lake') pushCircle(zf.x, zf.z, zf.radius + 0.42);
       }
+
+      const maxR = ROAMING_RADIUS - 0.65;
+      const dist = Math.hypot(nx, nz);
+      let hitEdge = false;
+      if (dist > maxR) {
+        hitEdge = true;
+        nx *= maxR / dist;
+        nz *= maxR / dist;
+      } else if (dist > maxR - 1.0) {
+        hitEdge = true;
+      }
+      return { x: nx, z: nz, hitEdge };
     };
 
     const projectLabel = (
@@ -780,11 +828,14 @@ export default function AstronautView({
       lastTime = now;
       elapsed += dt;
 
+      currentTerrainBundle?.updateSkyEffects(elapsed, dt);
+
       const curState = stateRef.current;
       const activeId = curState.activeAstronautId;
       const worldId = worldIdRef.current;
+      const gravity = getPlanetById(worldId).gravityMs2;
+      const atmoDrag = worldId === 'titan' ? 0.35 : 0;
 
-      // Move active astronaut with WASD / Arrow keys
       let fwd = 0;
       let right = 0;
       if (keys.has('KeyW') || keys.has('ArrowUp')) fwd += 1;
@@ -794,7 +845,6 @@ export default function AstronautView({
 
       const activeEntry = astroEntries.find((e) => e.profile.id === activeId) || astroEntries[0];
 
-      // Advance active procedural diagnostic animation
       let diagProgress = 0;
       let diagEnvelope = 0;
       if (activeDiagnostic) {
@@ -808,6 +858,7 @@ export default function AstronautView({
 
       const curCameraMode = cameraModeRef.current;
       let activeMoving = false;
+      let edgeWarning = false;
 
       astroEntries.forEach((entry, idx) => {
         const isSelected = entry.profile.id === activeId;
@@ -815,9 +866,7 @@ export default function AstronautView({
 
         if (curCameraMode === 'first_person') {
           entry.mesh.visible = !isSelected;
-          if (isSelected) {
-            entry.yaw = fpYaw;
-          }
+          if (isSelected) entry.yaw = fpYaw;
         } else {
           entry.mesh.visible = true;
         }
@@ -837,9 +886,14 @@ export default function AstronautView({
           _moveDir.set(0, 0, 0).addScaledVector(_forward, fwd).addScaledVector(_right, right);
           if (_moveDir.lengthSq() > 0.001) {
             _moveDir.normalize();
-            const speed = 4.8;
-            entry.x = THREE.MathUtils.clamp(entry.x + _moveDir.x * speed * dt, -14, 14);
-            entry.z = THREE.MathUtils.clamp(entry.z + _moveDir.z * speed * dt, -14, 14);
+            const speed = worldId === 'mars' ? 6.0 : worldId === 'titan' ? 5.0 : 5.5;
+            const resolved = resolveCollisionsAndPerimeter(
+              entry.x + _moveDir.x * speed * dt,
+              entry.z + _moveDir.z * speed * dt
+            );
+            entry.x = resolved.x;
+            entry.z = resolved.z;
+            edgeWarning = resolved.hitEdge;
 
             if (curCameraMode !== 'first_person') {
               const targetYaw = Math.atan2(_moveDir.x, _moveDir.z);
@@ -851,10 +905,25 @@ export default function AstronautView({
             moving = true;
             activeMoving = true;
           }
+        } else if (isSelected) {
+          const resolved = resolveCollisionsAndPerimeter(entry.x, entry.z);
+          entry.x = resolved.x;
+          entry.z = resolved.z;
+          edgeWarning = resolved.hitEdge;
+        }
+
+        if (!entry.grounded || entry.airOffset > 0) {
+          entry.vy -= (gravity + atmoDrag * entry.vy) * dt;
+          entry.airOffset += entry.vy * dt;
+          if (entry.airOffset <= 0) {
+            entry.airOffset = 0;
+            entry.vy = 0;
+            entry.grounded = true;
+          }
         }
 
         const gy = groundHeightAt(worldId, entry.x, entry.z);
-        let posY = gy;
+        let posY = gy + entry.airOffset;
         let renderYaw = entry.yaw;
 
         const isDiagTarget =
@@ -864,9 +933,14 @@ export default function AstronautView({
         if (refs) {
           refs.selectionRing.visible = isSelected;
 
-          // Base locomotion / idle pose
-          if (moving) {
-            entry.walkPhase += dt * 10;
+          if (!entry.grounded) {
+            refs.leftLeg.rotation.x = 0.35;
+            refs.rightLeg.rotation.x = -0.35;
+            refs.leftArm.rotation.x = -0.65;
+            refs.rightArm.rotation.x = -0.65;
+          } else if (moving) {
+            const cadence = 9.5 * Math.sqrt(Math.max(0.45, gravity / 2.2));
+            entry.walkPhase += dt * cadence;
             const swing = Math.sin(entry.walkPhase) * 0.55;
             refs.leftLeg.rotation.x = swing;
             refs.rightLeg.rotation.x = -swing;
@@ -884,7 +958,6 @@ export default function AstronautView({
             refs.rightArm.rotation.z = THREE.MathUtils.damp(refs.rightArm.rotation.z, 0, 8, dt);
           }
 
-          // Smooth defaults for neck and emissive readouts
           let targetHeadY = 0;
           let targetHeadX = 0;
           let targetVisorGlow = 0.12;
@@ -950,58 +1023,36 @@ export default function AstronautView({
           }
 
           if (refs.headPivot) {
-            refs.headPivot.rotation.y = THREE.MathUtils.damp(
-              refs.headPivot.rotation.y,
-              targetHeadY,
-              10,
-              dt
-            );
-            refs.headPivot.rotation.x = THREE.MathUtils.damp(
-              refs.headPivot.rotation.x,
-              targetHeadX,
-              10,
-              dt
-            );
+            refs.headPivot.rotation.y = THREE.MathUtils.damp(refs.headPivot.rotation.y, targetHeadY, 10, dt);
+            refs.headPivot.rotation.x = THREE.MathUtils.damp(refs.headPivot.rotation.x, targetHeadX, 10, dt);
           }
           if (refs.visorMat) {
-            refs.visorMat.emissiveIntensity = THREE.MathUtils.damp(
-              refs.visorMat.emissiveIntensity,
-              targetVisorGlow,
-              12,
-              dt
-            );
+            refs.visorMat.emissiveIntensity = THREE.MathUtils.damp(refs.visorMat.emissiveIntensity, targetVisorGlow, 12, dt);
           }
           if (refs.chestDisplayMat) {
-            refs.chestDisplayMat.emissiveIntensity = THREE.MathUtils.damp(
-              refs.chestDisplayMat.emissiveIntensity,
-              targetChestGlow,
-              12,
-              dt
-            );
+            refs.chestDisplayMat.emissiveIntensity = THREE.MathUtils.damp(refs.chestDisplayMat.emissiveIntensity, targetChestGlow, 12, dt);
           }
           if (refs.beaconMat) {
-            refs.beaconMat.emissiveIntensity = THREE.MathUtils.damp(
-              refs.beaconMat.emissiveIntensity,
-              targetBeaconGlow,
-              12,
-              dt
-            );
+            refs.beaconMat.emissiveIntensity = THREE.MathUtils.damp(refs.beaconMat.emissiveIntensity, targetBeaconGlow, 12, dt);
           }
         }
 
         entry.mesh.position.set(entry.x, posY, entry.z);
         entry.mesh.rotation.y = renderYaw;
+        entry.mesh.scale.setScalar(1);
       });
 
-      // Ground & animate Storm Flue and Planetary Data Sample
+      if (edgeWarning !== lastBoundaryAlert) {
+        lastBoundaryAlert = edgeWarning;
+        setNearBoundary(edgeWarning);
+      }
+
       const flueY = groundHeightAt(worldId, FLUE_POS.x, FLUE_POS.z);
       stormFlueGroup.position.set(FLUE_POS.x, flueY, FLUE_POS.z);
       const flueRefs = stormFlueGroup.userData.stormFlueRefs;
       if (flueRefs) {
-        const flueBoost =
-          activeDiagnostic?.kind === 'storm_flue' ? 7.5 * diagEnvelope : 0;
-        const spin =
-          Math.max(0.5, 5.2 * (1 - curState.stormFlue.cloggedPct / 110)) + flueBoost;
+        const flueBoost = activeDiagnostic?.kind === 'storm_flue' ? 7.5 * diagEnvelope : 0;
+        const spin = Math.max(0.5, 5.2 * (1 - curState.stormFlue.cloggedPct / 110)) + flueBoost;
         flueRefs.fanGroup.rotation.y += dt * spin;
         const hex =
           activeDiagnostic?.kind === 'storm_flue'
@@ -1021,8 +1072,7 @@ export default function AstronautView({
       dataSampleGroup.position.set(SAMPLE_POS.x, sampleY, SAMPLE_POS.z);
       const nodeRefs = dataSampleGroup.userData.nodeRefs;
       if (nodeRefs) {
-        const nodeBoost =
-          activeDiagnostic?.kind === 'data_node' ? 6.8 * diagEnvelope : 0;
+        const nodeBoost = activeDiagnostic?.kind === 'data_node' ? 6.8 * diagEnvelope : 0;
         nodeRefs.scanRing.rotation.y += dt * (1.4 + nodeBoost);
         nodeRefs.scanRing.rotation.x = THREE.MathUtils.damp(
           nodeRefs.scanRing.rotation.x,
@@ -1050,7 +1100,6 @@ export default function AstronautView({
         shipRefs.beaconMat.emissiveIntensity = 0.75 + 0.65 * Math.sin(elapsed * 3.1);
       }
 
-      // Camera mode positioning: First-Person Visor POV vs Third-Person Chase vs Orbit
       if (curCameraMode === 'first_person') {
         const bob = activeMoving ? Math.sin(activeEntry.walkPhase * 2) * 0.03 : 0;
         _fpEye.set(
@@ -1145,11 +1194,21 @@ export default function AstronautView({
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
       resizeObserver.disconnect();
-      if (terrainCleanup) terrainCleanup();
-      disposeObjectTree(crewGroup, shadowTex);
-      disposeObjectTree(stormFlueGroup, shadowTex);
-      disposeObjectTree(dataSampleGroup, shadowTex);
-      disposeObjectTree(spaceshipGroup, shadowTex);
+      if (currentTerrainBundle) currentTerrainBundle.dispose();
+      [plantedFlagMesh, stormFlueGroup, dataSampleGroup, spaceshipGroup, crewGroup].forEach((grp) => {
+        grp.traverse((obj) => {
+          const mesh = obj as THREE.Mesh;
+          if (mesh.geometry) mesh.geometry.dispose();
+          if (mesh.material) {
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            mats.forEach((m) => {
+              const std = m as THREE.MeshStandardMaterial;
+              if (std.map && std.map !== shadowTex) std.map.dispose();
+              m.dispose();
+            });
+          }
+        });
+      });
       shadowTex.dispose();
       envRT.dispose();
       roomEnv.dispose();
@@ -1163,7 +1222,7 @@ export default function AstronautView({
 
   useEffect(() => {
     syncWorldRef.current?.(activeWorldId);
-  }, [activeWorldId]);
+  }, [activeWorldId, state.flagsByWorld]);
 
   useEffect(() => {
     focusSelectedRef.current?.(state.activeAstronautId, false);
@@ -1174,27 +1233,26 @@ export default function AstronautView({
   }, [cameraMode]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#05070C] select-none">
-      {webglFailed ? (
-        <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-[#07090E]">
-          <Compass className="w-12 h-12 text-sky-400 mb-3" />
-          <h2 className="font-display text-2xl font-bold text-white mb-1">
+    <div className="relative w-full h-full bg-[#05070C] overflow-hidden select-none">
+      <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+
+      {webglFailed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[#07090E]">
+          <User className="w-10 h-10 text-sky-400 mb-3" />
+          <div className="font-display font-bold text-white text-lg">
             {activeAstronaut.name} · {activeAstronaut.role}
-          </h2>
-          <p className="text-sm text-slate-300 max-w-md mb-4">{activeAstronaut.taskDescription}</p>
-          <div className="text-xs font-mono text-slate-400">
-            WebGL unavailable — use the astronaut switcher below to manage crew tasks.
           </div>
+          <p className="text-xs text-slate-400 mt-1 max-w-md">
+            3D WebGL renderer unavailable in this browser session. Use the bottom Mission Control
+            dock to switch crew and log EVA work.
+          </p>
         </div>
-      ) : (
-        <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
       )}
 
-      {/* Projected 3D Crew & Equipment Labels */}
       {!webglFailed && (
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           {ASTRONAUTS.map((astro) => {
-            const isSelected = astro.id === state.activeAstronautId;
+            const isSelected = state.activeAstronautId === astro.id;
             return (
               <div
                 key={astro.id}
@@ -1202,10 +1260,10 @@ export default function AstronautView({
                   labelRefs.current[`av-astro-${astro.id}`] = el;
                 }}
                 style={{ opacity: 0 }}
-                className={`absolute top-0 left-0 px-2.5 py-0.5 rounded border text-[11px] font-mono whitespace-nowrap ${
+                className={`absolute top-0 left-0 px-2 py-0.5 rounded border text-[11px] font-mono whitespace-nowrap ${
                   isSelected
                     ? 'bg-[#0F1623]/95 border-sky-400 text-white font-bold'
-                    : 'bg-[#07090E]/90 border-slate-700 text-slate-200'
+                    : 'bg-[#07090E]/85 border-slate-700 text-slate-200'
                 }`}
               >
                 <span
@@ -1213,7 +1271,6 @@ export default function AstronautView({
                   style={{ backgroundColor: astro.suitColor }}
                 />
                 {astro.name}
-                {isSelected ? ' · Controlling' : ' · Click to Control'}
               </div>
             );
           })}
@@ -1223,7 +1280,7 @@ export default function AstronautView({
               labelRefs.current['av-flue'] = el;
             }}
             style={{ opacity: 0 }}
-            className="absolute top-0 left-0 px-2 py-0.5 rounded border border-amber-500/60 bg-[#07090E]/90 text-[10px] font-mono text-amber-300 whitespace-nowrap"
+            className="absolute top-0 left-0 px-2 py-0.5 rounded border border-amber-500/60 bg-[#07090E]/90 text-[10px] font-mono text-amber-200 whitespace-nowrap"
           >
             Storm Flue · {state.stormFlue.cloggedPct}% Clog
           </div>
@@ -1251,7 +1308,6 @@ export default function AstronautView({
         </div>
       )}
 
-      {/* First-Person EVA Helmet Visor Framing & Reticle */}
       {!webglFailed && cameraMode === 'first_person' && (
         <div className="pointer-events-none absolute inset-0 z-10">
           <div className="absolute inset-4 border border-amber-400/20 rounded-2xl" />
@@ -1262,7 +1318,13 @@ export default function AstronautView({
         </div>
       )}
 
-      {/* Minimal Top-Left Selected Astronaut Spec Badge (Unobtrusive, No Backdrop Blur) */}
+      {nearBoundary && (
+        <div className="pointer-events-none absolute top-16 right-4 z-20 px-3 py-1.5 rounded-lg bg-amber-950/95 border border-amber-400 text-xs font-mono text-amber-200 flex items-center gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+          Perimeter Boundary ({ROAMING_RADIUS}m) Reached
+        </div>
+      )}
+
       {!hudHidden && (
         <div className="absolute top-14 left-4 z-10 w-80 max-w-[calc(100vw-2rem)] rounded-xl bg-[#0F1623]/94 border border-slate-800 px-3 py-2.5">
           <div className="flex items-center justify-between gap-2 mb-1">
@@ -1275,7 +1337,7 @@ export default function AstronautView({
                 {activeAstronaut.name}
               </span>
               <span className="text-[11px] font-mono text-slate-400 truncate">
-                · {activeWorldConfig.name}
+                · {activeWorldConfig.name} ({activeWorldConfig.gravityMs2.toFixed(2)} m/s²)
               </span>
             </div>
             <button
@@ -1292,7 +1354,6 @@ export default function AstronautView({
             {activeAstronaut.role} · {activeProgress?.tasksCompleted || 0} tasks
           </div>
 
-          {/* Camera Perspective Selector: Orbit / 3rd Person / 1st Person */}
           <div className="grid grid-cols-3 gap-1 bg-[#07090E] border border-slate-800 rounded-lg p-0.5 mb-2">
             {(
               [
@@ -1317,7 +1378,6 @@ export default function AstronautView({
             ))}
           </div>
 
-          {/* Clickable 3D Suit Part Diagnostic Strip */}
           <div className="mb-2 pt-1.5 border-t border-slate-800/90">
             <div className="text-[10px] font-mono text-slate-400 mb-1 truncate">
               {hoveredInfo ? `Target: ${hoveredInfo}` : 'Suit Diagnostics (Click 3D Suit or Buttons)'}
@@ -1351,6 +1411,16 @@ export default function AstronautView({
           )}
 
           <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+            <button
+              type="button"
+              onClick={() => triggerJumpRef.current?.()}
+              className="px-2 py-1 rounded bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-cyan-300 flex items-center gap-1 whitespace-nowrap shrink-0"
+              title="Test planetary gravity jump [Space]"
+            >
+              <ArrowUp className="w-3 h-3" />
+              Jump [Space]
+            </button>
+
             <button
               type="button"
               onClick={() =>

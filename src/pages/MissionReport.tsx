@@ -272,7 +272,7 @@ export default function MissionReport({
                 Crew Field Work, Storm Flues &amp; Planetary Data
               </h2>
             </div>
-            <div className="flex items-center gap-4 text-xs font-mono tabular-nums text-slate-300">
+            <div className="flex flex-wrap items-center gap-4 text-xs font-mono tabular-nums text-slate-300">
               <span className="flex items-center gap-1.5">
                 <Database className="w-3.5 h-3.5 text-sky-400" />
                 {state.dataNodes.filter((n) => n.collected).length}/{state.dataNodes.length} Data Nodes
@@ -280,6 +280,13 @@ export default function MissionReport({
               <span className="flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5 text-emerald-400" />
                 {state.visitedWorlds.length}/4 Worlds Visited
+              </span>
+              <span className="text-amber-300">
+                Flags:{' '}
+                {Object.values(state.flagsByWorld).filter((f) => f.planted).length}/4
+              </span>
+              <span className="text-sky-300">
+                Achievements: {state.achievements.length}
               </span>
             </div>
           </div>

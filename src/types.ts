@@ -17,6 +17,32 @@ export type AstronautId = 'abubakr' | 'affan' | 'ali' | 'jawwad' | 'om' | 'ammar
 
 export type SuitPartId = 'helmet' | 'chest_pack' | 'plss_backpack' | 'arms_tools' | 'boots';
 
+export type SparePartId =
+  | 'cables'
+  | 'filters'
+  | 'batteries'
+  | 'seals'
+  | 'circuit_boards'
+  | 'mechanical_parts'
+  | 'antenna_components'
+  | 'repair_tools';
+
+export type ConstructionMaterialId = 'regolith_bricks' | 'alloys' | 'cryo_insulation';
+
+export type MedicalConditionId = 'exhaustion' | 'dehydration' | 'illness' | 'suit_trauma';
+
+export type CommsFaultId =
+  | 'transceiver_board'
+  | 'feed_horn_alignment'
+  | 'coax_cable'
+  | 'power_bus';
+
+export type MiniGameKind =
+  | 'circuit_patch'
+  | 'antenna_align'
+  | 'thermal_valve'
+  | 'fuel_transfer';
+
 export interface AstronautProfile {
   id: AstronautId;
   name: string;
@@ -41,6 +67,16 @@ export interface AstronautProgress {
   lastAction: string;
 }
 
+export interface AstronautVitalState {
+  healthPct: number;
+  fatiguePct: number; // 0 = rested, 100 = exhausted
+  hydrationPct: number; // 100 = hydrated, 0 = dehydrated
+  radiationPct: number;
+  medicalAlert: MedicalConditionId | null;
+  diagnosed: boolean;
+  sheltered: boolean;
+}
+
 export interface StormFlueState {
   cloggedPct: number;
   pressureKpa: number;
@@ -59,6 +95,7 @@ export interface PlanetaryDataNode {
   reading: string;
   scienceValue: number;
   summary: string;
+  sampleAnalyzed?: boolean;
 }
 
 export type BuildingTypeId =
@@ -69,7 +106,13 @@ export type BuildingTypeId =
   | 'greenhouse'
   | 'isru_plant'
   | 'radiation_shelter'
-  | 'comms';
+  | 'comms'
+  | 'medical_station'
+  | 'workshop'
+  | 'fuel_depot'
+  | 'rover_garage'
+  | 'research_lab'
+  | 'storage_depot';
 
 export interface DifficultyConfig {
   id: DifficultyId;
@@ -104,6 +147,11 @@ export interface PlanetConfig {
   accent: 'sky' | 'amber' | 'cyan' | 'emerald';
   solarEfficiency: number;
   radiationHazard: number;
+  gravityMs2: number;
+  atmosphereKpa: number;
+  tempRangeC: string;
+  roamingRadius: number;
+  resupplyDays: number;
 }
 
 export interface SystemTutorialItem {
@@ -143,6 +191,12 @@ export interface PlacedBuilding {
   level: number;
   online: boolean;
   cellIndex: number;
+  conditionPct: number;
+  dustPct: number;
+  damaged: boolean;
+  damageCause: string | null;
+  inspectedDamage: boolean;
+  requiredParts: Partial<Record<SparePartId, number>>;
 }
 
 export interface MissionConfig {
@@ -157,12 +211,23 @@ export interface DecisionOutcome {
   waterDelta?: number;
   foodDelta?: number;
   batteryDelta?: number;
+  fuelDelta?: number;
   budgetDelta?: number;
   scienceDelta?: number;
   shieldingDelta?: number;
   radiationDelta?: number;
   solarBoost?: number;
   waterBoost?: number;
+  damageBuildingType?: BuildingTypeId | 'random';
+  damageAmount?: number;
+  damageCause?: string;
+  commsFault?: CommsFaultId;
+  roverDamage?: number;
+  medicalAlertTarget?: {
+    astronautId?: AstronautId;
+    condition: MedicalConditionId;
+  };
+  dustSpike?: number;
   log: string;
 }
 
@@ -174,6 +239,7 @@ export interface EventChoice {
   longTerm: string;
   quality: 'best' | 'good' | 'risky';
   requiresBudget?: number;
+  requiresPart?: SparePartId;
   apply: (state: MissionState) => DecisionOutcome;
 }
 
@@ -184,6 +250,7 @@ export interface MissionEvent {
   description: string;
   scienceQuestion: string;
   scienceExplanation: string;
+  hazardSeverity?: 'info' | 'warning' | 'shelter';
   choices: EventChoice[];
 }
 
@@ -196,7 +263,9 @@ export interface DailyRates {
   foodCons: number;
   powerGen: number;
   powerUsed: number;
+  fuelProd: number;
   solarCondition: string;
+  tempC: number;
 }
 
 export interface DaySnapshot {
@@ -205,6 +274,7 @@ export interface DaySnapshot {
   water: number;
   food: number;
   powerPct: number;
+  fuelPct: number;
   shielding: number;
 }
 
@@ -224,6 +294,66 @@ export interface EventHistoryEntry {
   quality: 'best' | 'good' | 'risky';
 }
 
+export interface PlantedFlagState {
+  planted: boolean;
+  planetId: PlanetId;
+  x: number;
+  z: number;
+  siteLabel: string;
+  plantedBy: AstronautId;
+  day: number;
+}
+
+export interface CommsSystemState {
+  signalStrengthPct: number;
+  rangeKm: number;
+  latencySec: number;
+  windowOpen: boolean;
+  earthVisibilityPct: number;
+  fault: CommsFaultId | null;
+  repairStep: 'none' | 'inspected' | 'diagnosed' | 'parts_replaced' | 'tested';
+}
+
+export interface FuelSystemState {
+  current: number;
+  max: number;
+  shipTankPct: number;
+  isruSynthesisRate: number;
+  transitCost: number;
+  lastActionNote: string;
+}
+
+export interface RoverSystemState {
+  conditionPct: number;
+  chargePct: number;
+  dustPct: number;
+  damaged: boolean;
+  manualControl: boolean;
+}
+
+export interface PendingResupplyOrder {
+  id: string;
+  arrivalDay: number;
+  itemsSummary: string;
+  parts: Partial<Record<SparePartId, number>>;
+  medSupplies: number;
+}
+
+export interface LunarWorldState {
+  eclipseActive: boolean;
+  eclipsePhasePct: number;
+  lunarDustPct: number;
+  psrIceDiscovered: boolean;
+  micrometeoroidCount: number;
+}
+
+export interface RoboticExplorationState {
+  titanDroneChargePct: number;
+  titanMethaneSampled: boolean;
+  europaProbeDepthM: number;
+  europaSampleSterilized: boolean;
+}
+
 export interface MissionState {
   day: number;
   maxDays: number;
@@ -240,9 +370,13 @@ export interface MissionState {
   failureReason: string | null;
   activeAstronautId: AstronautId;
   crewProgress: Record<AstronautId, AstronautProgress>;
+  crewVitals: Record<AstronautId, AstronautVitalState>;
   stormFlue: StormFlueState;
   dataNodes: PlanetaryDataNode[];
   visitedWorlds: PlanetId[];
+  flagsByWorld: Record<PlanetId, PlantedFlagState>;
+  shelterRefugeActive: boolean;
+  hazardWarningText: string | null;
   crew: {
     total: number;
     safe: number;
@@ -254,7 +388,18 @@ export interface MissionState {
     food: { current: number; max: number };
     battery: { current: number; max: number };
     shielding: number;
+    medSupplies: number;
   };
+  fuel: FuelSystemState;
+  spareParts: Record<SparePartId, number>;
+  materials: Record<ConstructionMaterialId, number>;
+  comms: CommsSystemState;
+  rover: RoverSystemState;
+  toolsConditionPct: number;
+  pendingResupply: PendingResupplyOrder[];
+  lunarState: LunarWorldState;
+  roboticState: RoboticExplorationState;
+  achievements: string[];
   techUpgrades: {
     waterEfficiencyBonus: number;
     solarEfficiencyBonus: number;

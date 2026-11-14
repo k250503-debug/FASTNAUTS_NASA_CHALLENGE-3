@@ -5,9 +5,15 @@ import lunarOutpostHero from '../assets/images/lunar_outpost_hero_1794552137891.
 
 interface LandingProps {
   onStartMission: () => void;
+  hasSavedMission?: boolean;
+  onResumeMission?: () => void;
 }
 
-export default function Landing({ onStartMission }: LandingProps) {
+export default function Landing({
+  onStartMission,
+  hasSavedMission = false,
+  onResumeMission,
+}: LandingProps) {
   const [modalType, setModalType] = useState<'about' | 'howto' | 'stem' | null>(null);
   const [heroImgFailed, setHeroImgFailed] = useState(false);
 
@@ -31,9 +37,9 @@ export default function Landing({ onStartMission }: LandingProps) {
               Become a mission commander.
             </h1>
             <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-xl mb-8">
-              Build a lunar or Martian outpost under strict budget constraints, operate
-              interconnected life-support and ISRU systems, and keep six astronauts safe across
-              multi-week expeditions.
+              Build an outpost on the Moon, Mars, Titan, or Europa under realistic planetary
+              gravity, operate life-support, medical, comms, and spare-parts systems, and keep six
+              astronauts safe across multi-week expeditions.
             </p>
 
             <div className="flex flex-wrap items-center gap-4">
@@ -43,8 +49,18 @@ export default function Landing({ onStartMission }: LandingProps) {
                 className="px-7 py-3.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-display font-bold text-base flex items-center gap-2.5 transition-colors whitespace-nowrap shrink-0"
               >
                 <Play className="w-4 h-4 fill-current" />
-                Start Mission
+                {hasSavedMission ? 'New Mission' : 'Start Mission'}
               </button>
+              {hasSavedMission && onResumeMission && (
+                <button
+                  type="button"
+                  onClick={onResumeMission}
+                  className="px-6 py-3.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-display font-bold text-base flex items-center gap-2.5 transition-colors whitespace-nowrap shrink-0"
+                >
+                  <Rocket className="w-4 h-4" />
+                  Resume Saved Mission
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setModalType('howto')}

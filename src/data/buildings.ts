@@ -15,9 +15,9 @@ export const BUILDINGS: BuildingDef[] = [
     maxPerBase: 2,
     required: true,
     benefit:
-      'Pressurized crew quarters with baseline air scrubbing and greywater recovery. Required for mission launch.',
+      'Pressurized crew quarters with baseline air scrubbing, animated airlock refuge door, and greywater recovery. Required for mission launch.',
     tradeOff:
-      'Draws steady baseline electricity; a second habitat expands oxygen scrubbing and shielding.',
+      'Draws steady baseline electricity; a second habitat expands oxygen scrubbing and shelter capacity.',
     upgradeCost: 140,
   },
   {
@@ -27,7 +27,7 @@ export const BUILDINGS: BuildingDef[] = [
     category: 'Power Generation',
     cost: 160,
     powerReq: 0,
-    powerGen: 34,
+    powerGen: 36,
     waterReq: 0,
     produces: { oxygen: 0, water: 0, food: 0 },
     shieldingBonus: 0,
@@ -37,7 +37,7 @@ export const BUILDINGS: BuildingDef[] = [
     benefit:
       'Converts sunlight into electrical power for life support, recycling, and ISRU extraction equipment.',
     tradeOff:
-      'Output drops during lunar shadow cycles or Martian dust storms — pair with Battery Storage.',
+      'Output drops during lunar solar eclipses, dust buildup, or Martian dust storms — pair with Battery Storage and regular cleaning.',
     upgradeCost: 110,
   },
   {
@@ -54,9 +54,9 @@ export const BUILDINGS: BuildingDef[] = [
     maxPerBase: 3,
     required: false,
     benefit:
-      'Stores surplus solar electricity during peak sunlight to keep critical life support online during darkness.',
+      'Stores surplus solar electricity during peak sunlight to keep critical life support online during darkness or eclipses.',
     tradeOff:
-      'Generates no electricity on its own, but prevents brownouts during lunar shadow or dust storms.',
+      'Generates no electricity on its own, but prevents brownouts during lunar shadow, eclipses, or dust storms.',
     upgradeCost: 100,
   },
   {
@@ -64,7 +64,7 @@ export const BUILDINGS: BuildingDef[] = [
     name: 'Water Recycling System',
     shortName: 'Water Recycler',
     category: 'Closed-Loop Life Support',
-    cost: 200,
+    cost: 190,
     powerReq: 7,
     waterReq: 0,
     produces: { oxygen: 0, water: 11, food: 0 },
@@ -75,7 +75,7 @@ export const BUILDINGS: BuildingDef[] = [
     benefit:
       'Purifies crew wastewater and cabin humidity back into clean drinking and greenhouse irrigation water.',
     tradeOff:
-      'Dramatically slows water depletion, yet shuts down to 45% efficiency during power brownouts.',
+      'Dramatically slows water depletion, yet drops to 45% efficiency during brownouts or filter shortages.',
     upgradeCost: 130,
   },
   {
@@ -83,10 +83,10 @@ export const BUILDINGS: BuildingDef[] = [
     name: 'Hydroponic Greenhouse',
     shortName: 'Greenhouse',
     category: 'Food & Bio-Regeneration',
-    cost: 220,
-    powerReq: 9,
+    cost: 210,
+    powerReq: 8,
     waterReq: 5,
-    produces: { oxygen: 4, water: 0, food: 7 },
+    produces: { oxygen: 4, water: 0, food: 8 },
     shieldingBonus: 0,
     batteryBonus: 0,
     maxPerBase: 2,
@@ -102,7 +102,7 @@ export const BUILDINGS: BuildingDef[] = [
     name: 'ISRU Regolith & Ice Plant',
     shortName: 'ISRU Extractor',
     category: 'Planetary ISRU',
-    cost: 250,
+    cost: 240,
     powerReq: 10,
     waterReq: 0,
     produces: { oxygen: 6, water: 6, food: 0 },
@@ -111,7 +111,7 @@ export const BUILDINGS: BuildingDef[] = [
     maxPerBase: 2,
     required: false,
     benefit:
-      'Extracts oxygen from regolith oxides, mines water ice, and sinters lunar/Martian dust into radiation armor.',
+      'Extracts oxygen from regolith oxides, mines water ice, and supplies raw regolith/alloys for repairs.',
     tradeOff:
       'Highest electrical power draw on the base, but enables genuine planetary self-sufficiency.',
     upgradeCost: 160,
@@ -121,7 +121,7 @@ export const BUILDINGS: BuildingDef[] = [
     name: 'Radiation Shelter',
     shortName: 'Rad Shelter',
     category: 'Crew Protection',
-    cost: 180,
+    cost: 170,
     powerReq: 4,
     waterReq: 0,
     produces: { oxygen: 0, water: 0, food: 0 },
@@ -130,9 +130,9 @@ export const BUILDINGS: BuildingDef[] = [
     maxPerBase: 2,
     required: false,
     benefit:
-      'High-mass shielded safe haven protecting astronauts during solar particle events and cosmic radiation.',
+      'High-mass shielded safe haven with storm doors protecting astronauts during solar flares, micrometeoroids, and Jovian surges.',
     tradeOff:
-      'Produces no consumables, but prevents long-term crew radiation illness.',
+      'Produces no consumables, but prevents long-term radiation sickness and houses crew safely during storms.',
     upgradeCost: 120,
   },
   {
@@ -140,7 +140,7 @@ export const BUILDINGS: BuildingDef[] = [
     name: 'Deep-Space Comms Array',
     shortName: 'Comms Array',
     category: 'Operations & Telemetry',
-    cost: 130,
+    cost: 120,
     powerReq: 4,
     waterReq: 0,
     produces: { oxygen: 0, water: 0, food: 0 },
@@ -149,10 +149,124 @@ export const BUILDINGS: BuildingDef[] = [
     maxPerBase: 1,
     required: false,
     benefit:
-      'Maintains high-bandwidth Earth link for solar weather alerts, research science points, and resupply coordination.',
+      'Maintains Earth comms uplink, communication windows, early weather warnings, and signal diagnostics.',
     tradeOff:
-      'Consumes steady power while boosting daily science generation and hazard warning lead time.',
+      'Consumes steady power and requires antenna spare parts if damaged by storms or micrometeoroids.',
     upgradeCost: 90,
+  },
+  {
+    id: 'medical_station',
+    name: 'Crew Medical Station',
+    shortName: 'Medical Bay',
+    category: 'Crew Health & Triage',
+    cost: 150,
+    powerReq: 5,
+    waterReq: 1,
+    produces: { oxygen: 0, water: 0, food: 0 },
+    shieldingBonus: 5,
+    batteryBonus: 0,
+    maxPerBase: 1,
+    required: false,
+    benefit:
+      'Diagnostics & treatment bay for exhaustion, dehydration, radiation illness, and suit trauma. Doubles daily crew recovery.',
+    tradeOff:
+      'Uses modest power and water, yet keeps crew healthy and productive during long hazards.',
+    upgradeCost: 110,
+  },
+  {
+    id: 'workshop',
+    name: 'Engineering Workshop',
+    shortName: 'Workshop',
+    category: 'Manufacturing & Repair',
+    cost: 160,
+    powerReq: 6,
+    waterReq: 0,
+    produces: { oxygen: 0, water: 0, food: 0 },
+    shieldingBonus: 0,
+    batteryBonus: 0,
+    maxPerBase: 1,
+    required: false,
+    benefit:
+      'Fabricates spare parts (cables, seals, filters, circuit boards, antenna parts) from materials & recycles damaged scrap.',
+    tradeOff:
+      'Draws electrical power when active, yet prevents supply lockouts when resupply is days away.',
+    upgradeCost: 115,
+  },
+  {
+    id: 'fuel_depot',
+    name: 'Cryo Fuel & Propellant Depot',
+    shortName: 'Fuel Depot',
+    category: 'Propulsion & Transit',
+    cost: 150,
+    powerReq: 5,
+    waterReq: 2,
+    produces: { oxygen: 2, water: 0, food: 0 },
+    shieldingBonus: 0,
+    batteryBonus: 0,
+    maxPerBase: 1,
+    required: false,
+    benefit:
+      'Synthesizes methane/LOX or hydrolox propellant from local ice & CO₂ for interplanetary flights and Starship refueling.',
+    tradeOff:
+      'Requires water feedstock and cryogenic cooling power, enabling sustainable multi-world travel.',
+    upgradeCost: 110,
+  },
+  {
+    id: 'rover_garage',
+    name: 'Rover & Drone Service Bay',
+    shortName: 'Rover Garage',
+    category: 'Mobility & Robotics',
+    cost: 130,
+    powerReq: 4,
+    waterReq: 0,
+    produces: { oxygen: 0, water: 0, food: 0 },
+    shieldingBonus: 0,
+    batteryBonus: 15,
+    maxPerBase: 1,
+    required: false,
+    benefit:
+      'Recharges rover batteries, shelters surface vehicles from dust & cryo-frost, and supports Titan Drone / Europa Probe ops.',
+    tradeOff:
+      'Modest power draw, but cuts rover wear by 50% and keeps surface mobility ready.',
+    upgradeCost: 95,
+  },
+  {
+    id: 'research_lab',
+    name: 'Planetary Science Lab',
+    shortName: 'Research Lab',
+    category: 'Science & Analysis',
+    cost: 145,
+    powerReq: 5,
+    waterReq: 1,
+    produces: { oxygen: 0, water: 0, food: 0 },
+    shieldingBonus: 0,
+    batteryBonus: 0,
+    maxPerBase: 1,
+    required: false,
+    benefit:
+      'Spectrometer & core sample lab: doubles science gained from collected data nodes and speeds tech research.',
+    tradeOff:
+      'Draws power and water for wet chemistry, accelerating outpost upgrades.',
+    upgradeCost: 105,
+  },
+  {
+    id: 'storage_depot',
+    name: 'Parts & Materials Warehouse',
+    shortName: 'Storage Depot',
+    category: 'Logistics & Supply',
+    cost: 110,
+    powerReq: 1,
+    waterReq: 0,
+    produces: { oxygen: 0, water: 0, food: 0 },
+    shieldingBonus: 5,
+    batteryBonus: 0,
+    maxPerBase: 2,
+    required: false,
+    benefit:
+      'Pressurized vault storing extra spare parts, construction alloys, medkits, and emergency rations against storm disruptions.',
+    tradeOff:
+      'Minimal power draw while protecting inventory and giving +8 starting medkits & spare parts.',
+    upgradeCost: 85,
   },
 ];
 

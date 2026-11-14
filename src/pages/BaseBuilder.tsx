@@ -3,9 +3,14 @@ import {
   AlertTriangle,
   ArrowLeft,
   BatteryCharging,
+  Car,
   CheckCircle2,
   Droplets,
+  FlaskConical,
+  Fuel,
+  HeartPulse,
   Home,
+  Package,
   Pickaxe,
   Radio,
   Rocket,
@@ -13,11 +18,13 @@ import {
   Sprout,
   Sun,
   Trash2,
+  Wrench,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { BUILDINGS, getBuildingDef } from '../data/buildings';
 import { DIFFICULTIES, PLANETS } from '../data/planets';
+import { makePlacedBuilding } from '../simulation/resources';
 import type { BuildingTypeId, MissionConfig, PlacedBuilding } from '../types';
 
 export const BUILDING_ICONS: Record<BuildingTypeId, LucideIcon> = {
@@ -29,6 +36,12 @@ export const BUILDING_ICONS: Record<BuildingTypeId, LucideIcon> = {
   isru_plant: Pickaxe,
   radiation_shelter: Shield,
   comms: Radio,
+  medical_station: HeartPulse,
+  workshop: Wrench,
+  fuel_depot: Fuel,
+  rover_garage: Car,
+  research_lab: FlaskConical,
+  storage_depot: Package,
 };
 
 interface BaseBuilderProps {
@@ -48,7 +61,7 @@ export default function BaseBuilder({
   const planet = PLANETS.find((p) => p.id === config.planetId) || PLANETS[0];
 
   const totalBudget = difficulty.budget;
-  const [grid, setGrid] = useState<(PlacedBuilding | null)[]>(Array(12).fill(null));
+  const [grid, setGrid] = useState<(PlacedBuilding | null)[]>(Array(16).fill(null));
   const [selectedToolId, setSelectedToolId] = useState<BuildingTypeId>('habitat');
 
   const placedBuildings = grid.filter((b): b is PlacedBuilding => b !== null);
@@ -80,36 +93,29 @@ export default function BaseBuilder({
     if (countOfType(selectedDef.id) >= selectedDef.maxPerBase) return;
 
     const next = [...grid];
-    next[cellIdx] = {
-      uid: `${selectedDef.id}-${cellIdx}-${Date.now()}`,
-      typeId: selectedDef.id,
-      level: 1,
-      online: true,
-      cellIndex: cellIdx,
-    };
+    next[cellIdx] = makePlacedBuilding(
+      `${selectedDef.id}-${cellIdx}-${Date.now()}`,
+      selectedDef.id,
+      cellIdx
+    );
     setGrid(next);
   };
 
   const handleAutoStarter = () => {
-    const starterGrid: (PlacedBuilding | null)[] = Array(12).fill(null);
+    const starterGrid: (PlacedBuilding | null)[] = Array(16).fill(null);
     const starterIds: BuildingTypeId[] = ['habitat', 'solar', 'water_recycler', 'battery'];
-    if (totalBudget >= 1000) starterIds.push('greenhouse');
-    if (totalBudget >= 1300) starterIds.push('radiation_shelter');
+    if (totalBudget >= 950) starterIds.push('greenhouse');
+    if (totalBudget >= 1200) starterIds.push('medical_station');
+    if (totalBudget >= 1400) starterIds.push('comms');
 
     let budgetLeft = totalBudget;
-    const placementSlots = [5, 1, 6, 2, 9, 4];
+    const placementSlots = [5, 1, 6, 2, 9, 4, 10];
 
     starterIds.forEach((id, i) => {
       const def = getBuildingDef(id);
       if (def && budgetLeft >= def.cost) {
         const slot = placementSlots[i];
-        starterGrid[slot] = {
-          uid: `${id}-${slot}-${Date.now() + i}`,
-          typeId: id,
-          level: 1,
-          online: true,
-          cellIndex: slot,
-        };
+        starterGrid[slot] = makePlacedBuilding(`${id}-${slot}-${Date.now() + i}`, id, slot);
         budgetLeft -= def.cost;
       }
     });
@@ -135,11 +141,11 @@ export default function BaseBuilder({
               <ArrowLeft className="w-3.5 h-3.5" /> Back to Briefing
             </button>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-white">
-              Outpost Builder · {planet.name}
+              Outpost Builder · {planet.name} (g = {planet.gravityMs2} m/s²)
             </h1>
             <p className="text-xs sm:text-sm text-slate-400">
-              Select a module on the left and click any sector cell to deploy. Click a placed
-              module to remove and refund credits.
+              Select a module on the left and click any sector cell (4×4) to deploy. Click a placed
+              module to remove and refund credits. You can also expand during the mission.
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -152,7 +158,7 @@ export default function BaseBuilder({
             </button>
             <button
               type="button"
-              onClick={() => setGrid(Array(12).fill(null))}
+              onClick={() => setGrid(Array(16).fill(null))}
               className="px-3.5 py-2 rounded-lg bg-space-900 hover:bg-space-800 border border-slate-800 text-xs text-slate-400 hover:text-white transition-colors whitespace-nowrap"
             >
               Clear Grid
@@ -161,10 +167,9 @@ export default function BaseBuilder({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1">
-          {/* Left Sidebar: Module Inventory */}
-          <aside className="lg:col-span-3 rounded-xl bg-space-900 border border-slate-800 p-4 flex flex-col gap-2">
+          <aside className="lg:col-span-3 rounded-xl bg-space-900 border border-slate-800 p-4 flex flex-col gap-2 max-h-[560px] overflow-y-auto">
             <div className="text-xs font-mono uppercase tracking-wider text-sky-400 mb-1">
-              Module Inventory
+              Module Inventory ({BUILDINGS.length} Types)
             </div>
             {BUILDINGS.map((b) => {
               const Icon = BUILDING_ICONS[b.id];
@@ -178,7 +183,7 @@ export default function BaseBuilder({
                   type="button"
                   key={b.id}
                   onClick={() => setSelectedToolId(b.id)}
-                  className={`w-full text-left p-3 rounded-lg border transition-colors flex items-center justify-between gap-2 ${
+                  className={`w-full text-left p-2.5 rounded-lg border transition-colors flex items-center justify-between gap-2 ${
                     isSelected
                       ? 'bg-sky-500/15 border-sky-400'
                       : 'bg-space-950 border-slate-800 hover:border-slate-600'
@@ -218,10 +223,9 @@ export default function BaseBuilder({
             })}
           </aside>
 
-          {/* Center: Planetary Surface Grid */}
           <section
             className={`lg:col-span-6 rounded-xl border p-5 flex flex-col justify-between ${
-              planet.id === 'moon'
+              planet.id === 'moon' || planet.id === 'europa'
                 ? 'bg-gradient-to-b from-slate-900/90 via-[#0C1322] to-slate-950 border-slate-800'
                 : 'bg-gradient-to-b from-[#1E110C] via-[#190E0A] to-[#110906] border-amber-900/40'
             }`}
@@ -230,15 +234,15 @@ export default function BaseBuilder({
               <div>
                 <div className="text-xs font-mono text-slate-400">{planet.location}</div>
                 <div className="text-sm font-semibold text-white">
-                  Base Construction Grid (4 × 3 Sectors)
+                  Base Construction Grid (4 × 4 Sectors)
                 </div>
               </div>
               <div className="text-xs font-mono tabular-nums text-slate-400">
-                {placedBuildings.length} / 12 Slots Used
+                {placedBuildings.length} / 16 Slots Used
               </div>
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 my-auto">
+            <div className="grid grid-cols-4 gap-2.5 my-auto">
               {grid.map((cell, idx) => {
                 const def = cell ? getBuildingDef(cell.typeId) : null;
                 const Icon = cell ? BUILDING_ICONS[cell.typeId] : null;
@@ -265,23 +269,23 @@ export default function BaseBuilder({
                         : 'bg-black/20 border-dashed border-slate-800 cursor-not-allowed opacity-60'
                     }`}
                   >
-                    <span className="absolute top-1.5 left-2 text-[10px] font-mono text-slate-500">
+                    <span className="absolute top-1 left-1.5 text-[10px] font-mono text-slate-500">
                       S{String(idx + 1).padStart(2, '0')}
                     </span>
 
                     {cell && Icon && def ? (
                       <>
-                        <Icon className="w-6 h-6 text-sky-300 mb-1.5 group-hover:hidden" />
-                        <Trash2 className="w-6 h-6 text-rose-400 mb-1.5 hidden group-hover:block" />
-                        <span className="text-xs font-semibold text-white text-center leading-tight">
+                        <Icon className="w-5 h-5 text-sky-300 mb-1 group-hover:hidden" />
+                        <Trash2 className="w-5 h-5 text-rose-400 mb-1 hidden group-hover:block" />
+                        <span className="text-[11px] font-semibold text-white text-center leading-tight">
                           {def.shortName}
                         </span>
-                        <span className="text-[11px] font-mono tabular-nums text-emerald-400 mt-0.5">
+                        <span className="text-[10px] font-mono tabular-nums text-emerald-400 mt-0.5">
                           {def.cost} CR
                         </span>
                       </>
                     ) : (
-                      <span className="text-xs text-slate-500 group-hover:text-sky-300">
+                      <span className="text-[11px] text-slate-500 group-hover:text-sky-300">
                         + Deploy
                       </span>
                     )}
@@ -321,7 +325,6 @@ export default function BaseBuilder({
             </div>
           </section>
 
-          {/* Right Sidebar: Selected Building Information */}
           <aside className="lg:col-span-3 rounded-xl bg-space-900 border border-slate-800 p-5 flex flex-col justify-between">
             {selectedDef && (
               <div>
@@ -360,7 +363,7 @@ export default function BaseBuilder({
                     </span>
                   </div>
                   <div className="p-2.5 rounded-lg bg-space-950 border border-slate-800">
-                    <div className="text-slate-400 mb-1">Production & Protection</div>
+                    <div className="text-slate-400 mb-1">Production &amp; Protection</div>
                     <div className="font-mono text-white space-y-0.5">
                       {selectedDef.produces.oxygen > 0 && (
                         <div>+{selectedDef.produces.oxygen} Oxygen / day</div>
@@ -377,10 +380,6 @@ export default function BaseBuilder({
                       {selectedDef.shieldingBonus > 0 && (
                         <div>+{selectedDef.shieldingBonus}% Shielding</div>
                       )}
-                      {selectedDef.id === 'comms' && (
-                        <div>Early Alerts & +Science Output</div>
-                      )}
-                      {selectedDef.id === 'solar' && <div>Clean Solar Generation</div>}
                     </div>
                   </div>
                 </div>
@@ -400,7 +399,6 @@ export default function BaseBuilder({
           </aside>
         </div>
 
-        {/* Bottom Budget Bar & Launch CTA */}
         <div className="rounded-xl bg-space-900 border border-slate-800 p-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="w-full sm:w-2/3">
             <div className="flex justify-between text-xs font-mono mb-1.5">

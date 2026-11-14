@@ -136,6 +136,16 @@ export default function EmergencyCenter({
           </div>
         </div>
 
+        {state.shelterRefugeActive && (
+          <div className="p-3 rounded-lg bg-amber-950/50 border border-amber-500/50 text-xs text-amber-200 flex items-center gap-2 mb-4">
+            <Shield className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Emergency Shelter Refuge Active:</strong> Crew has entered pressurized
+              habitats &amp; Starship airlocks while external sensors log structural damage.
+            </span>
+          </div>
+        )}
+
         <div className="p-4 rounded-lg bg-space-950 border border-slate-800 mb-6">
           <div className="text-xs font-mono text-amber-400 mb-1">Mission Situation</div>
           <p className="text-sm sm:text-base text-slate-200 leading-relaxed">
@@ -172,7 +182,10 @@ export default function EmergencyCenter({
 
         <div className="space-y-3">
           {active.choices.map((choice) => {
-            const affordable = !choice.requiresBudget || state.budget >= choice.requiresBudget;
+            const budgetOk = !choice.requiresBudget || state.budget >= choice.requiresBudget;
+            const partOk =
+              !choice.requiresPart || (state.spareParts[choice.requiresPart] || 0) >= 1;
+            const affordable = budgetOk && partOk;
             return (
               <button
                 type="button"
@@ -191,6 +204,7 @@ export default function EmergencyCenter({
                   </span>
                   <span className="text-xs font-mono text-sky-300 whitespace-nowrap">
                     {choice.impactSummary}
+                    {choice.requiresPart && !partOk ? ` (Needs ${choice.requiresPart})` : ''}
                   </span>
                 </div>
 

@@ -4,46 +4,64 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { ASTRONAUTS, getAstronautById } from '../data/astronauts';
 import { getBuildingDef } from '../data/buildings';
+import { getPlanetById } from '../data/planets';
 import type { AstronautId, MissionState, PlanetId } from '../types';
+import { LANDED_SHIP_YAW } from './MissionLaunchScene';
 import {
   createAstronautMesh,
   createBuildingMesh,
   createContactShadowTexture,
   createDataNodeMesh,
+  createEuropaProbeMesh,
   createNasaSpaceshipMesh,
+  createPlantedFlagMesh,
   createRoverMesh,
   createSolarGridTexture,
   createStormFlueMesh,
+  createTitanDroneMesh,
+  setShelterDoorsOpen,
+  setShipAirlockAndRamp,
 } from './models';
 import {
+  ROAMING_RADIUS,
   createTerrainAndSkyGroup,
   getPlanetEnvironmentSpec,
+  getWorldRockColliders,
+  getWorldZoneFeatures,
   groundHeightAt,
 } from './terrain';
 
 export interface NearbyTarget {
-  kind: 'storm_flue' | 'data_node' | 'building';
+  kind: 'storm_flue' | 'data_node' | 'building' | 'spaceship';
   id: string;
   label: string;
   sublabel: string;
   actionLabel: string;
 }
 
+export type OutpostCameraMode = 'follow' | 'overview' | 'first_person';
+
 interface OutpostScene3DProps {
   state: MissionState;
-  cameraMode: 'follow' | 'overview';
+  cameraMode: OutpostCameraMode;
   onProximityChange: (target: NearbyTarget | null) => void;
+  onBoundaryWarning?: (nearEdge: boolean) => void;
+  onPositionUpdate?: (positions: {
+    astronauts: Array<{ id: AstronautId; x: number; z: number }>;
+    rover: { x: number; z: number; yaw: number };
+  }) => void;
   onSelectAstronaut: (id: AstronautId) => void;
   onSelectBuilding: (uid: string) => void;
   onServiceBuilding: (uid: string) => void;
   onInteractStormFlue: () => void;
+  onInteractSpaceship: () => void;
   onCollectDataNode: (nodeId: string) => void;
   onFieldWork?: () => void;
   interactRef: React.MutableRefObject<(() => void) | null>;
+  jumpRef?: React.MutableRefObject<(() => void) | null>;
   virtualMoveRef?: React.MutableRefObject<{ forward: number; right: number }>;
 }
 
-// Pre-allocated math helpers outside the render loop to prevent GC pressure
 const _forward = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _moveDir = new THREE.Vector3();
@@ -52,16 +70,18 @@ const _desiredTarget = new THREE.Vector3();
 const _projVec = new THREE.Vector3();
 const _upAxis = new THREE.Vector3(0, 1, 0);
 const _pointerNdc = new THREE.Vector2();
+const _fpEye = new THREE.Vector3();
+const _fpLook = new THREE.Vector3();
 
-const STORM_FLUE_POS = { x: 0, z: 6.2 };
-const SPACESHIP_POS = { x: 10.6, z: 3.4 };
+export const STORM_FLUE_POS = { x: 0, z: 8.6 };
+export const SPACESHIP_POS = { x: 12.2, z: 4.4 };
 
 export function getBuildingWorldPos(cellIndex: number): { x: number; z: number } {
   const col = cellIndex % 4;
   const row = Math.floor(cellIndex / 4);
   return {
     x: (col - 1.5) * 3.8,
-    z: (row - 1) * 3.8 - 1.5,
+    z: (row - 1.5) * 3.8,
   };
 }
 
@@ -79,9 +99,7 @@ function detectSoftwareWebGL(): boolean {
   }
 }
 
-function findUserDataInAncestors(
-  obj: THREE.Object3D | null
-): {
+function findUserDataInAncestors(obj: THREE.Object3D | null): {
   astronautId?: AstronautId;
   buildingUid?: string;
   interactType?: string;
@@ -102,51 +120,73 @@ function findUserDataInAncestors(
   return null;
 }
 
+const ROVER_WAYPOINTS: Array<{ x: number; z: number }> = [
+  { x: 9.8, z: 9.8 },
+  { x: 0, z: 12.8 },
+  { x: -10.2, z: 9.2 },
+  { x: -12.6, z: 0 },
+  { x: -10.5, z: -10.5 },
+  { x: 0, z: -12.6 },
+  { x: 10.6, z: -9.8 },
+  { x: 16.5, z: -2.5 },
+  { x: 16.2, z: 9.2 },
+];
+
 export default function OutpostScene3D({
   state,
   cameraMode,
   onProximityChange,
+  onBoundaryWarning,
+  onPositionUpdate,
   onSelectAstronaut,
   onSelectBuilding,
   onServiceBuilding,
   onInteractStormFlue,
+  onInteractSpaceship,
   onCollectDataNode,
   onFieldWork,
   interactRef,
+  jumpRef,
   virtualMoveRef,
 }: OutpostScene3DProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const labelRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const stateRef = useRef(state);
-  const cameraModeRef = useRef(cameraMode);
+  const cameraModeRef = useRef<OutpostCameraMode>(cameraMode);
 
   stateRef.current = state;
   cameraModeRef.current = cameraMode;
 
   const callbacksRef = useRef({
     onProximityChange,
+    onBoundaryWarning,
+    onPositionUpdate,
     onSelectAstronaut,
     onSelectBuilding,
     onServiceBuilding,
     onInteractStormFlue,
+    onInteractSpaceship,
     onCollectDataNode,
     onFieldWork,
   });
   callbacksRef.current = {
     onProximityChange,
+    onBoundaryWarning,
+    onPositionUpdate,
     onSelectAstronaut,
     onSelectBuilding,
     onServiceBuilding,
     onInteractStormFlue,
+    onInteractSpaceship,
     onCollectDataNode,
     onFieldWork,
   };
 
-  // Persistent mutable scene synchronization hooks
   const syncActionsRef = useRef<{
     syncPlanet: (planetId: PlanetId) => void;
     syncBuildings: () => void;
     syncDataNodes: () => void;
+    syncFlag: () => void;
     focusAstronaut: (id: AstronautId) => void;
   } | null>(null);
 
@@ -154,8 +194,8 @@ export default function OutpostScene3D({
   const triggerWorkAnimRef = useRef<
     ((kind: NearbyTarget['kind'] | 'field_work', targetX?: number, targetZ?: number) => void) | null
   >(null);
+  const triggerJumpRef = useRef<(() => void) | null>(null);
 
-  // Trigger proximity interaction & hand-work animation from keyboard [E] or HUD button
   const triggerNearbyInteract = () => {
     const target = nearbyTargetRef.current;
     if (!target) {
@@ -170,6 +210,10 @@ export default function OutpostScene3D({
       tx = STORM_FLUE_POS.x;
       tz = STORM_FLUE_POS.z;
       callbacksRef.current.onInteractStormFlue();
+    } else if (target.kind === 'spaceship') {
+      tx = SPACESHIP_POS.x;
+      tz = SPACESHIP_POS.z;
+      callbacksRef.current.onInteractSpaceship();
     } else if (target.kind === 'data_node') {
       const node = stateRef.current.dataNodes.find((n) => n.id === target.id);
       if (node) {
@@ -191,6 +235,9 @@ export default function OutpostScene3D({
   };
 
   interactRef.current = triggerNearbyInteract;
+  if (jumpRef) {
+    jumpRef.current = () => triggerJumpRef.current?.();
+  }
 
   useEffect(() => {
     const container = mountRef.current;
@@ -219,19 +266,18 @@ export default function OutpostScene3D({
       52,
       (container.clientWidth || 800) / (container.clientHeight || 600),
       0.2,
-      220
+      240
     );
-    camera.position.set(0, 12.5, 19.5);
+    camera.position.set(0, 12.5, 20.5);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.maxPolarAngle = Math.PI * 0.455;
-    controls.minDistance = 5.5;
-    controls.maxDistance = 40;
+    controls.minDistance = 4.5;
+    controls.maxDistance = 42;
     controls.target.set(0, 1.0, 2.0);
 
-    // Studio/Outpost environment lighting for realistic metallic visors & solar panels
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     const roomEnv = new RoomEnvironment();
     const envRT = pmremGenerator.fromScene(roomEnv, 0.04);
@@ -251,10 +297,10 @@ export default function OutpostScene3D({
     sunLight.shadow.mapSize.height = isSoftwareGl ? 1024 : 2048;
     sunLight.shadow.camera.near = 2;
     sunLight.shadow.camera.far = 75;
-    sunLight.shadow.camera.left = -22;
-    sunLight.shadow.camera.right = 22;
-    sunLight.shadow.camera.top = 22;
-    sunLight.shadow.camera.bottom = -22;
+    sunLight.shadow.camera.left = -24;
+    sunLight.shadow.camera.right = 24;
+    sunLight.shadow.camera.top = 24;
+    sunLight.shadow.camera.bottom = -24;
     sunLight.shadow.bias = -0.0004;
     sunLight.shadow.normalBias = 0.02;
     scene.add(sunLight);
@@ -263,7 +309,6 @@ export default function OutpostScene3D({
     rimLight.position.set(-16, 10, -18);
     scene.add(rimLight);
 
-    // Shared procedural textures
     const maxAnisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
     const shadowTex = createContactShadowTexture();
     const solarTex = createSolarGridTexture(maxAnisotropy);
@@ -271,16 +316,61 @@ export default function OutpostScene3D({
     // Terrain & Sky container
     const environmentContainer = new THREE.Group();
     scene.add(environmentContainer);
-    let currentTerrainCleanup: (() => void) | null = null;
+    let currentTerrainBundle: ReturnType<typeof createTerrainAndSkyGroup> | null = null;
     let currentPlanetId: PlanetId | null = null;
+    let currentRockColliders = getWorldRockColliders(stateRef.current.planetId);
+    let currentZoneFeatures = getWorldZoneFeatures(stateRef.current.planetId);
+
+    // World-specific autonomous robotics (Titan Dragonfly Drone & Europa Cryo Probe)
+    const titanDrone = createTitanDroneMesh();
+    scene.add(titanDrone);
+    const europaProbe = createEuropaProbeMesh();
+    scene.add(europaProbe);
+
+    // Storm Flue Station
+    const stormFlueGroup = createStormFlueMesh(shadowTex);
+    stormFlueGroup.position.set(STORM_FLUE_POS.x, 0, STORM_FLUE_POS.z);
+    stormFlueGroup.userData.interactType = 'storm_flue';
+    scene.add(stormFlueGroup);
+
+    // Autonomous / Manual ISRU Rover
+    const roverGroup = createRoverMesh(shadowTex);
+    scene.add(roverGroup);
+
+    // Persistent NASA Starship (locked yaw matching landing cinematic!)
+    const spaceshipGroup = createNasaSpaceshipMesh(shadowTex, maxAnisotropy);
+    spaceshipGroup.position.set(
+      SPACESHIP_POS.x,
+      groundHeightAt(stateRef.current.planetId, SPACESHIP_POS.x, SPACESHIP_POS.z),
+      SPACESHIP_POS.z
+    );
+    spaceshipGroup.rotation.y = LANDED_SHIP_YAW;
+    spaceshipGroup.userData.interactType = 'spaceship';
+    setShipAirlockAndRamp(spaceshipGroup, 0.0, 0.0);
+    scene.add(spaceshipGroup);
+
+    // Permanent Planted Expedition Flag
+    const plantedFlagGroup = createPlantedFlagMesh(shadowTex, maxAnisotropy);
+    scene.add(plantedFlagGroup);
+
+    const syncFlag = () => {
+      const pid = stateRef.current.planetId;
+      const flag = stateRef.current.flagsByWorld[pid];
+      if (flag && flag.planted) {
+        plantedFlagGroup.visible = true;
+        plantedFlagGroup.position.set(flag.x, groundHeightAt(pid, flag.x, flag.z), flag.z);
+      } else {
+        plantedFlagGroup.visible = false;
+      }
+    };
 
     const syncPlanet = (planetId: PlanetId) => {
       if (currentPlanetId === planetId) return;
       currentPlanetId = planetId;
 
-      if (currentTerrainCleanup) {
-        currentTerrainCleanup();
-        currentTerrainCleanup = null;
+      if (currentTerrainBundle) {
+        currentTerrainBundle.dispose();
+        currentTerrainBundle = null;
       }
       while (environmentContainer.children.length > 0) {
         environmentContainer.remove(environmentContainer.children[0]);
@@ -295,38 +385,31 @@ export default function OutpostScene3D({
       sunLight.color.setHex(spec.sunColor);
       sunLight.intensity = spec.sunIntensity;
 
-      const { group, dispose } = createTerrainAndSkyGroup(planetId, maxAnisotropy);
-      environmentContainer.add(group);
-      currentTerrainCleanup = dispose;
+      currentTerrainBundle = createTerrainAndSkyGroup(planetId, maxAnisotropy);
+      environmentContainer.add(currentTerrainBundle.group);
+      currentRockColliders = getWorldRockColliders(planetId);
+      currentZoneFeatures = getWorldZoneFeatures(planetId);
+
       spaceshipGroup.position.y = groundHeightAt(planetId, SPACESHIP_POS.x, SPACESHIP_POS.z);
+      stormFlueGroup.position.y = groundHeightAt(planetId, STORM_FLUE_POS.x, STORM_FLUE_POS.z);
+
+      titanDrone.visible = planetId === 'titan';
+      europaProbe.visible = planetId === 'europa';
+      if (planetId === 'europa') {
+        const px = -12.8;
+        const pz = -12.0;
+        europaProbe.position.set(px, groundHeightAt('europa', px, pz), pz);
+      }
+
+      syncFlag();
     };
 
-    // Storm Flue Station
-    const stormFlueGroup = createStormFlueMesh(shadowTex);
-    stormFlueGroup.position.set(STORM_FLUE_POS.x, 0, STORM_FLUE_POS.z);
-    stormFlueGroup.userData.interactType = 'storm_flue';
-    scene.add(stormFlueGroup);
-
-    // Autonomous ISRU Rover
-    const roverGroup = createRoverMesh(shadowTex);
-    scene.add(roverGroup);
-
-    // NASA Expedition Spaceship with Pakistan Flag near the work area
-    const spaceshipGroup = createNasaSpaceshipMesh(shadowTex, maxAnisotropy);
-    spaceshipGroup.position.set(
-      SPACESHIP_POS.x,
-      groundHeightAt(stateRef.current.planetId, SPACESHIP_POS.x, SPACESHIP_POS.z),
-      SPACESHIP_POS.z
-    );
-    spaceshipGroup.rotation.y = -Math.PI * 0.58;
-    scene.add(spaceshipGroup);
-
-    // Live Outpost Storm Dust / Ice Squall Particle Layer
-    const stormCount = 220;
+    // Live Outpost Storm Particles (Methane rain / Iron-oxide dust / Cryo mist / Charged dust)
+    const stormCount = 240;
     const stormPos = new Float32Array(stormCount * 3);
     for (let i = 0; i < stormCount; i++) {
       stormPos[i * 3] = ((i * 37) % 44) - 22;
-      stormPos[i * 3 + 1] = 0.25 + ((i * 19) % 10);
+      stormPos[i * 3 + 1] = 0.25 + ((i * 19) % 12);
       stormPos[i * 3 + 2] = ((i * 53) % 40) - 20;
     }
     const stormGeo = new THREE.BufferGeometry();
@@ -342,24 +425,36 @@ export default function OutpostScene3D({
     stormPoints.frustumCulled = false;
     scene.add(stormPoints);
 
-    // Outpost Buildings Container
+    // Outpost Buildings Container (with animated refuge doors & damage state)
     const buildingsGroup = new THREE.Group();
     scene.add(buildingsGroup);
+    const buildingMeshMap = new Map<string, { typeId: string; mesh: THREE.Group; x: number; z: number }>();
     let lastBuildingsSig = '';
 
     const syncBuildings = () => {
       const buildings = stateRef.current.buildings;
-      const sig = buildings.map((b) => `${b.uid}:${b.level}:${b.online ? 1 : 0}`).join('|');
+      const sig = buildings
+        .map(
+          (b) =>
+            `${b.uid}:${b.level}:${b.online ? 1 : 0}:${b.damaged ? 1 : 0}:${Math.floor(
+              (b.dustPct || 0) / 25
+            )}`
+        )
+        .join('|');
       if (sig === lastBuildingsSig) return;
       lastBuildingsSig = sig;
 
       while (buildingsGroup.children.length > 0) {
         buildingsGroup.remove(buildingsGroup.children[0]);
       }
+      buildingMeshMap.clear();
 
       buildings.forEach((b) => {
         const pos = getBuildingWorldPos(b.cellIndex);
-        const mesh = createBuildingMesh(b.typeId, b.level, b.online, shadowTex, solarTex);
+        const mesh = createBuildingMesh(b.typeId, b.level, b.online, shadowTex, solarTex, {
+          damaged: b.damaged,
+          dustPct: b.dustPct,
+        });
         mesh.position.set(
           pos.x,
           groundHeightAt(stateRef.current.planetId, pos.x, pos.z),
@@ -367,6 +462,7 @@ export default function OutpostScene3D({
         );
         mesh.userData.buildingUid = b.uid;
         buildingsGroup.add(mesh);
+        buildingMeshMap.set(b.uid, { typeId: b.typeId, mesh, x: pos.x, z: pos.z });
       });
     };
 
@@ -394,34 +490,58 @@ export default function OutpostScene3D({
       });
     };
 
-    // 6 Articulated Astronauts
+    // 6 Articulated Astronauts with real gravity jump state & shelter refuge state
     const astronautsGroup = new THREE.Group();
     scene.add(astronautsGroup);
 
     const astroEntries = ASTRONAUTS.map((profile, idx) => {
       const mesh = createAstronautMesh(profile, shadowTex);
-      mesh.position.set(
-        profile.startX,
-        groundHeightAt(stateRef.current.planetId, profile.startX, profile.startZ),
-        profile.startZ
-      );
+      const sx = idx < 3 ? -7.4 + idx * 1.4 : 7.6;
+      const sz = idx < 3 ? 8.2 : -2.2 + (idx - 3) * 2.2;
+      mesh.position.set(sx, groundHeightAt(stateRef.current.planetId, sx, sz), sz);
       astronautsGroup.add(mesh);
       return {
         profile,
         mesh,
-        x: profile.startX,
-        z: profile.startZ,
+        x: sx,
+        z: sz,
         yaw: 0,
+        airOffset: 0,
+        vy: 0,
+        grounded: true,
         walkPhase: idx * 1.1,
         patrolAngle: idx * ((Math.PI * 2) / ASTRONAUTS.length),
+        shelteredInside: false,
       };
     });
+
+    // Rover Navigation State (collision-free waypoint + obstacle avoidance)
+    const roverNav = {
+      x: 10.5,
+      z: 9.8,
+      yaw: Math.PI * 0.65,
+      speed: 2.3,
+      waypointIdx: 1,
+      wheelSpin: 0,
+    };
+
+    let fpYaw = 0;
+    let fpPitch = -0.05;
+    let isFpDragging = false;
+    let fpLastPointer = { x: 0, y: 0 };
 
     const focusAstronaut = (id: AstronautId) => {
       const found = astroEntries.find((e) => e.profile.id === id);
       if (!found) return;
+      if (cameraModeRef.current === 'first_person') {
+        fpYaw = found.yaw;
+        fpPitch = -0.05;
+        controls.enabled = false;
+        return;
+      }
+      controls.enabled = true;
       if (cameraModeRef.current === 'follow') {
-        const py = groundHeightAt(stateRef.current.planetId, found.x, found.z);
+        const py = groundHeightAt(stateRef.current.planetId, found.x, found.z) + found.airOffset;
         controls.target.set(found.x, py + 1.15, found.z);
       }
     };
@@ -429,7 +549,8 @@ export default function OutpostScene3D({
     syncPlanet(stateRef.current.planetId);
     syncBuildings();
     syncDataNodes();
-    syncActionsRef.current = { syncPlanet, syncBuildings, syncDataNodes, focusAstronaut };
+    syncFlag();
+    syncActionsRef.current = { syncPlanet, syncBuildings, syncDataNodes, syncFlag, focusAstronaut };
 
     let workAnim: {
       astronautId: AstronautId;
@@ -451,7 +572,14 @@ export default function OutpostScene3D({
       };
     };
 
-    // Keyboard & Pointer controls
+    triggerJumpRef.current = () => {
+      const active = astroEntries.find((e) => e.profile.id === stateRef.current.activeAstronautId);
+      if (active && active.grounded && !active.shelteredInside) {
+        active.vy = 3.35;
+        active.grounded = false;
+      }
+    };
+
     const keys = new Set<string>();
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
@@ -461,6 +589,10 @@ export default function OutpostScene3D({
       if (code === 'KeyE' && !e.repeat) {
         triggerNearbyInteract();
       }
+      if (code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        triggerJumpRef.current?.();
+      }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       keys.delete(e.code);
@@ -468,15 +600,29 @@ export default function OutpostScene3D({
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
-    // Raycast Click vs Orbit Drag Detection
     const raycaster = new THREE.Raycaster();
     let pointerDownPos = { x: 0, y: 0 };
 
     const onPointerDown = (e: PointerEvent) => {
       pointerDownPos = { x: e.clientX, y: e.clientY };
+      if (cameraModeRef.current === 'first_person') {
+        isFpDragging = true;
+        fpLastPointer = { x: e.clientX, y: e.clientY };
+      }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (cameraModeRef.current === 'first_person' && isFpDragging) {
+        const dx = e.clientX - fpLastPointer.x;
+        const dy = e.clientY - fpLastPointer.y;
+        fpLastPointer = { x: e.clientX, y: e.clientY };
+        fpYaw -= dx * 0.0055;
+        fpPitch = THREE.MathUtils.clamp(fpPitch - dy * 0.0045, -1.05, 1.05);
+      }
     };
 
     const onPointerUp = (e: PointerEvent) => {
+      isFpDragging = false;
       const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
       if (moveDist > 6) return;
 
@@ -486,7 +632,7 @@ export default function OutpostScene3D({
 
       raycaster.setFromCamera(_pointerNdc, camera);
       const hits = raycaster.intersectObjects(
-        [astronautsGroup, stormFlueGroup, dataNodesGroup, buildingsGroup],
+        [astronautsGroup, stormFlueGroup, spaceshipGroup, dataNodesGroup, buildingsGroup],
         true
       );
       if (hits.length === 0) return;
@@ -499,6 +645,8 @@ export default function OutpostScene3D({
         focusAstronaut(hitData.astronautId);
       } else if (hitData.interactType === 'storm_flue') {
         callbacksRef.current.onInteractStormFlue();
+      } else if (hitData.interactType === 'spaceship') {
+        callbacksRef.current.onInteractSpaceship();
       } else if (hitData.dataNodeId) {
         callbacksRef.current.onCollectDataNode(hitData.dataNodeId);
       } else if (hitData.buildingUid) {
@@ -507,9 +655,9 @@ export default function OutpostScene3D({
     };
 
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerup', onPointerUp);
 
-    // ResizeObserver for crisp canvas sizing
     const handleResize = () => {
       const w = container.clientWidth || 800;
       const h = container.clientHeight || 600;
@@ -520,7 +668,6 @@ export default function OutpostScene3D({
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(container);
 
-    // Animation loop state
     let disposed = false;
     let contextLost = false;
     let rafId = 0;
@@ -528,6 +675,9 @@ export default function OutpostScene3D({
     let lastTime = performance.now();
     let elapsed = 0;
     let lastReportedTargetKey = '';
+    let lastBoundaryHit = false;
+    let shelterDoorOpen01 = 0;
+    let posUpdateCooldown = 0;
 
     const onContextLost = (e: Event) => {
       e.preventDefault();
@@ -571,11 +721,8 @@ export default function OutpostScene3D({
 
     const scheduleNextTick = () => {
       if (disposed || contextLost) return;
-      if (isSoftwareGl) {
-        afterDraw(tick);
-      } else {
-        rafId = requestAnimationFrame(tick);
-      }
+      if (isSoftwareGl) afterDraw(tick);
+      else rafId = requestAnimationFrame(tick);
     };
 
     const projectLabelToScreen = (
@@ -599,6 +746,75 @@ export default function OutpostScene3D({
       el.style.transform = `translate3d(${sx.toFixed(1)}px, ${sy.toFixed(1)}px, 0) translate(-50%, -100%)`;
     };
 
+    // Push any entity (astronaut or rover) out of buildings, Storm Flue, Ship, Flag, Rocks, and Titan Lake
+    const resolveObstaclesAndPerimeter = (
+      x: number,
+      z: number,
+      entityRadius: number,
+      allowShipAirlock = false
+    ): { x: number; z: number; hitBoundary: boolean } => {
+      let nx = x;
+      let nz = z;
+
+      const pushCircle = (cx: number, cz: number, minDist: number) => {
+        const dx = nx - cx;
+        const dz = nz - cz;
+        const d = Math.hypot(dx, dz);
+        if (d < minDist) {
+          if (d > 0.001) {
+            const p = minDist - d;
+            nx += (dx / d) * p;
+            nz += (dz / d) * p;
+          } else {
+            nx += minDist;
+          }
+        }
+      };
+
+      for (const b of stateRef.current.buildings) {
+        const bp = getBuildingWorldPos(b.cellIndex);
+        pushCircle(bp.x, bp.z, 1.72 + entityRadius);
+      }
+
+      pushCircle(STORM_FLUE_POS.x, STORM_FLUE_POS.z, 1.55 + entityRadius);
+
+      if (!allowShipAirlock) {
+        pushCircle(SPACESHIP_POS.x, SPACESHIP_POS.z, 2.55 + entityRadius);
+      }
+
+      const flag = stateRef.current.flagsByWorld[stateRef.current.planetId];
+      if (flag?.planted) {
+        pushCircle(flag.x, flag.z, 0.55 + entityRadius);
+      }
+
+      for (const rock of currentRockColliders) {
+        pushCircle(rock.x, rock.z, rock.radius + entityRadius);
+      }
+
+      for (const zf of currentZoneFeatures) {
+        if (zf.kind === 'methane_lake') {
+          pushCircle(zf.x, zf.z, zf.radius + entityRadius);
+        } else if (zf.kind === 'cryo_plume') {
+          pushCircle(zf.x, zf.z, 1.4 + entityRadius);
+        }
+      }
+
+      // Smooth Radial Roaming Boundary Lock (R = 23.6m inside 24m pylons)
+      const maxR = ROAMING_RADIUS - 0.55;
+      const distFromOrigin = Math.hypot(nx, nz);
+      let hitBoundary = false;
+      if (distFromOrigin > maxR) {
+        hitBoundary = true;
+        const scale = maxR / distFromOrigin;
+        nx *= scale;
+        nz *= scale;
+      } else if (distFromOrigin > maxR - 1.1) {
+        hitBoundary = true;
+      }
+
+      return { x: nx, z: nz, hitBoundary };
+    };
+
     const tick = () => {
       if (disposed || contextLost) return;
 
@@ -610,8 +826,40 @@ export default function OutpostScene3D({
       const currentState = stateRef.current;
       const activeId = currentState.activeAstronautId;
       const planetId = currentState.planetId;
+      const planetConfig = getPlanetById(planetId);
+      const gravity = planetConfig.gravityMs2; // Real planetary gravity: 1.62 / 3.71 / 1.35 / 1.31
+      const atmoDrag = planetId === 'titan' ? 0.35 : 0; // Dense 145kPa Titan air damping
 
-      // 1. Move Active Astronaut via WASD / Arrow Keys (camera-relative XZ)
+      // Find nearest Shelter / Habitat / Starship door target for storm refuge
+      const refugeTargets: Array<{ x: number; z: number; doorX: number; doorZ: number; uid?: string }> = [];
+      currentState.buildings.forEach((b) => {
+        if (b.typeId === 'radiation_shelter' || b.typeId === 'habitat') {
+          const bp = getBuildingWorldPos(b.cellIndex);
+          refugeTargets.push({ x: bp.x, z: bp.z + 1.35, doorX: bp.x, doorZ: bp.z + 2.25, uid: b.uid });
+        }
+      });
+      // Starship door world coords
+      const shipDoorLocalZ = 3.2;
+      const shipRefuge = {
+        x: SPACESHIP_POS.x + Math.sin(LANDED_SHIP_YAW) * 1.6,
+        z: SPACESHIP_POS.z + Math.cos(LANDED_SHIP_YAW) * 1.6,
+        doorX: SPACESHIP_POS.x + Math.sin(LANDED_SHIP_YAW) * shipDoorLocalZ,
+        doorZ: SPACESHIP_POS.z + Math.cos(LANDED_SHIP_YAW) * shipDoorLocalZ,
+      };
+      refugeTargets.push(shipRefuge);
+
+      const isRefugeActive = currentState.shelterRefugeActive;
+      const targetDoorOpen = isRefugeActive ? 1 : 0;
+      shelterDoorOpen01 = THREE.MathUtils.damp(shelterDoorOpen01, targetDoorOpen, 4.5, dt);
+
+      buildingMeshMap.forEach((bEntry) => {
+        if (bEntry.typeId === 'radiation_shelter' || bEntry.typeId === 'habitat') {
+          setShelterDoorsOpen(bEntry.mesh, shelterDoorOpen01);
+        }
+      });
+      setShipAirlockAndRamp(spaceshipGroup, shelterDoorOpen01, shelterDoorOpen01);
+
+      // Keyboard movement inputs (route to Rover if rover.manualControl, else active Astronaut)
       let fwdInput = 0;
       let rightInput = 0;
       if (keys.has('KeyW') || keys.has('ArrowUp')) fwdInput += 1;
@@ -623,105 +871,135 @@ export default function OutpostScene3D({
         rightInput += virtualMoveRef.current.right;
       }
 
+      const isDrivingRover = Boolean(currentState.rover.manualControl && !currentState.rover.damaged);
+
       let workProgress = 0;
       let workEnvelope = 0;
       if (workAnim) {
         workAnim.timer += dt;
         workProgress = Math.min(1, workAnim.timer / workAnim.duration);
         workEnvelope = Math.sin(workProgress * Math.PI);
-        if (workAnim.timer >= workAnim.duration) {
-          workAnim = null;
-        }
+        if (workAnim.timer >= workAnim.duration) workAnim = null;
       }
 
       const activeEntry = astroEntries.find((e) => e.profile.id === activeId) || astroEntries[0];
+      let activeMoving = false;
+      let boundaryWarningActive = false;
 
       astroEntries.forEach((entry, idx) => {
-        const isControlled = entry.profile.id === activeId;
+        const isControlled = entry.profile.id === activeId && !isDrivingRover;
         let moving = false;
 
-        if (isControlled && (Math.abs(fwdInput) > 0.01 || Math.abs(rightInput) > 0.01)) {
-          camera.getWorldDirection(_forward);
-          _forward.y = 0;
-          if (_forward.lengthSq() < 0.0001) _forward.set(0, 0, -1);
-          _forward.normalize();
-          _right.crossVectors(_forward, _upAxis).normalize();
-
-          _moveDir
-            .set(0, 0, 0)
-            .addScaledVector(_forward, fwdInput)
-            .addScaledVector(_right, rightInput);
-          if (_moveDir.lengthSq() > 0.001) {
-            _moveDir.normalize();
-            const speed = 6.4;
-            entry.x = THREE.MathUtils.clamp(entry.x + _moveDir.x * speed * dt, -20, 20);
-            entry.z = THREE.MathUtils.clamp(entry.z + _moveDir.z * speed * dt, -20, 20);
-
-            // Smooth yaw toward movement vector
-            const targetYaw = Math.atan2(_moveDir.x, _moveDir.z);
-            let diff = targetYaw - entry.yaw;
-            while (diff > Math.PI) diff -= Math.PI * 2;
-            while (diff < -Math.PI) diff += Math.PI * 2;
-            entry.yaw += diff * Math.min(1, dt * 12);
-            moving = true;
+        if (isRefugeActive) {
+          // Storm / Hazard Refuge Behavior: walk smoothly through open door into nearest shelter/ship
+          let nearestRef = shipRefuge;
+          let minD = Infinity;
+          for (const rt of refugeTargets) {
+            const d = Math.hypot(entry.x - rt.doorX, entry.z - rt.doorZ);
+            if (d < minD) {
+              minD = d;
+              nearestRef = rt;
+            }
           }
-        } else if (!isControlled) {
-          // Gentle autonomous crew patrol around their NASA work sector
-          entry.patrolAngle += dt * (0.28 + idx * 0.03);
-          const targetX = entry.profile.startX + Math.cos(entry.patrolAngle) * 1.15;
-          const targetZ = entry.profile.startZ + Math.sin(entry.patrolAngle * 0.85) * 1.15;
-          const dx = targetX - entry.x;
-          const dz = targetZ - entry.z;
-          if (Math.hypot(dx, dz) > 0.05) {
-            entry.x += dx * Math.min(1, dt * 1.6);
-            entry.z += dz * Math.min(1, dt * 1.6);
+          const distToDoor = Math.hypot(entry.x - nearestRef.doorX, entry.z - nearestRef.doorZ);
+          if (distToDoor < 0.72) {
+            // Walk straight inside doorway at 1.0 scale, then shield indoors
+            entry.x = THREE.MathUtils.lerp(entry.x, nearestRef.x, dt * 3.5);
+            entry.z = THREE.MathUtils.lerp(entry.z, nearestRef.z, dt * 3.5);
+            if (Math.hypot(entry.x - nearestRef.x, entry.z - nearestRef.z) < 0.55) {
+              entry.shelteredInside = true;
+            }
+          } else if (!entry.shelteredInside) {
+            const dx = nearestRef.doorX - entry.x;
+            const dz = nearestRef.doorZ - entry.z;
+            const step = Math.min(distToDoor, 5.2 * dt);
+            entry.x += (dx / distToDoor) * step;
+            entry.z += (dz / distToDoor) * step;
             entry.yaw = Math.atan2(dx, dz);
             moving = true;
           }
+        } else {
+          // Exit shelter smoothly when hazard clears
+          if (entry.shelteredInside) {
+            entry.shelteredInside = false;
+            entry.x += 0.35;
+            entry.z += 1.4;
+          }
+
+          if (isControlled && (Math.abs(fwdInput) > 0.01 || Math.abs(rightInput) > 0.01)) {
+            if (cameraModeRef.current === 'first_person') {
+              _forward.set(Math.sin(fpYaw), 0, Math.cos(fpYaw)).normalize();
+            } else {
+              camera.getWorldDirection(_forward);
+              _forward.y = 0;
+              if (_forward.lengthSq() < 0.0001) _forward.set(0, 0, -1);
+              _forward.normalize();
+            }
+            _right.crossVectors(_forward, _upAxis).normalize();
+            _moveDir.set(0, 0, 0).addScaledVector(_forward, fwdInput).addScaledVector(_right, rightInput);
+
+            if (_moveDir.lengthSq() > 0.001) {
+              _moveDir.normalize();
+              // Subtle gravity-responsive walk speed
+              const speed = planetId === 'mars' ? 6.8 : planetId === 'titan' ? 5.6 : 6.2;
+              const rawX = entry.x + _moveDir.x * speed * dt;
+              const rawZ = entry.z + _moveDir.z * speed * dt;
+              const resolved = resolveObstaclesAndPerimeter(rawX, rawZ, 0.45);
+              entry.x = resolved.x;
+              entry.z = resolved.z;
+              boundaryWarningActive = resolved.hitBoundary;
+
+              if (cameraModeRef.current !== 'first_person') {
+                const targetYaw = Math.atan2(_moveDir.x, _moveDir.z);
+                let diff = targetYaw - entry.yaw;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                entry.yaw += diff * Math.min(1, dt * 12);
+              }
+              moving = true;
+              activeMoving = true;
+            }
+          } else if (!isControlled) {
+            // Non-active crew gently patrol around their assigned zone inside perimeter
+            entry.patrolAngle += dt * (0.25 + idx * 0.025);
+            const anchorX = idx < 3 ? -7.8 + idx * 1.8 : 7.8;
+            const anchorZ = idx < 3 ? 8.8 : -2.4 + (idx - 3) * 2.4;
+            const tx = anchorX + Math.cos(entry.patrolAngle) * 1.1;
+            const tz = anchorZ + Math.sin(entry.patrolAngle * 0.85) * 1.1;
+            const dx = tx - entry.x;
+            const dz = tz - entry.z;
+            if (Math.hypot(dx, dz) > 0.06) {
+              const resolved = resolveObstaclesAndPerimeter(
+                entry.x + dx * Math.min(1, dt * 1.4),
+                entry.z + dz * Math.min(1, dt * 1.4),
+                0.45
+              );
+              entry.x = resolved.x;
+              entry.z = resolved.z;
+              entry.yaw = Math.atan2(dx, dz);
+              moving = true;
+            }
+          } else {
+            const resolved = resolveObstaclesAndPerimeter(entry.x, entry.z, 0.45);
+            entry.x = resolved.x;
+            entry.z = resolved.z;
+            boundaryWarningActive = resolved.hitBoundary;
+          }
         }
 
-        // Simple collision push-out from buildings & Storm Flue
-        for (const b of currentState.buildings) {
-          const bp = getBuildingWorldPos(b.cellIndex);
-          const dx = entry.x - bp.x;
-          const dz = entry.z - bp.z;
-          const dist = Math.hypot(dx, dz);
-          if (dist < 1.85 && dist > 0.001) {
-            const push = 1.85 - dist;
-            entry.x += (dx / dist) * push;
-            entry.z += (dz / dist) * push;
-          }
-        }
-        {
-          const dx = entry.x - STORM_FLUE_POS.x;
-          const dz = entry.z - STORM_FLUE_POS.z;
-          const dist = Math.hypot(dx, dz);
-          if (dist < 1.65 && dist > 0.001) {
-            const push = 1.65 - dist;
-            entry.x += (dx / dist) * push;
-            entry.z += (dz / dist) * push;
-          }
-        }
-        {
-          const dx = entry.x - SPACESHIP_POS.x;
-          const dz = entry.z - SPACESHIP_POS.z;
-          const dist = Math.hypot(dx, dz);
-          if (dist < 2.65 && dist > 0.001) {
-            const push = 2.65 - dist;
-            entry.x += (dx / dist) * push;
-            entry.z += (dz / dist) * push;
+        // Planetary Gravity Jump & Landing Physics (g = 1.62 / 3.71 / 1.35 / 1.31)
+        if (!entry.grounded || entry.airOffset > 0) {
+          entry.vy -= (gravity + atmoDrag * entry.vy) * dt;
+          entry.airOffset += entry.vy * dt;
+          if (entry.airOffset <= 0) {
+            entry.airOffset = 0;
+            entry.vy = 0;
+            entry.grounded = true;
           }
         }
 
-        const isWorking = Boolean(
-          workAnim && workAnim.astronautId === entry.profile.id && !moving
-        );
-        if (
-          isWorking &&
-          workAnim &&
-          workAnim.targetX !== undefined &&
-          workAnim.targetZ !== undefined
-        ) {
+        const isWorking = Boolean(workAnim && workAnim.astronautId === entry.profile.id && !moving);
+        if (isWorking && workAnim && workAnim.targetX !== undefined && workAnim.targetZ !== undefined) {
           const targetYaw = Math.atan2(workAnim.targetX - entry.x, workAnim.targetZ - entry.z);
           let diff = targetYaw - entry.yaw;
           while (diff > Math.PI) diff -= Math.PI * 2;
@@ -730,20 +1008,31 @@ export default function OutpostScene3D({
         }
 
         const gy = groundHeightAt(planetId, entry.x, entry.z);
-        entry.mesh.position.set(entry.x, gy, entry.z);
+        entry.mesh.position.set(entry.x, gy + entry.airOffset, entry.z);
         entry.mesh.rotation.y = entry.yaw;
+        entry.mesh.scale.setScalar(1); // NEVER scale-pop!
 
-        // Articulated walk & E-key hand-work limb animations
+        const isFirstPersonSelf =
+          cameraModeRef.current === 'first_person' && entry.profile.id === activeId;
+        entry.mesh.visible = !entry.shelteredInside && !isFirstPersonSelf;
+
         const refs = entry.mesh.userData.animRefs;
         if (refs) {
-          refs.selectionRing.visible = isControlled;
+          refs.selectionRing.visible = entry.profile.id === activeId && !isDrivingRover;
           let targetHeadX = 0;
           let targetHeadY = 0;
           let targetChestGlow = 0.28;
           let targetVisorGlow = 0.12;
 
-          if (moving) {
-            entry.walkPhase += dt * (isControlled ? 10 : 5);
+          if (!entry.grounded) {
+            // Low-G airborne leap pose
+            refs.leftLeg.rotation.x = 0.35;
+            refs.rightLeg.rotation.x = -0.35;
+            refs.leftArm.rotation.x = -0.65;
+            refs.rightArm.rotation.x = -0.65;
+          } else if (moving) {
+            const cadence = (isControlled ? 9.5 : 4.8) * Math.sqrt(Math.max(0.45, gravity / 2.2));
+            entry.walkPhase += dt * cadence;
             const swing = Math.sin(entry.walkPhase) * (isControlled ? 0.55 : 0.3);
             refs.leftLeg.rotation.x = swing;
             refs.rightLeg.rotation.x = -swing;
@@ -768,20 +1057,7 @@ export default function OutpostScene3D({
               18,
               dt
             );
-            refs.leftArm.rotation.z = THREE.MathUtils.damp(
-              refs.leftArm.rotation.z,
-              (0.24 + Math.sin(workProgress * Math.PI * 4) * 0.1) * workEnvelope,
-              14,
-              dt
-            );
-            refs.rightArm.rotation.z = THREE.MathUtils.damp(
-              refs.rightArm.rotation.z,
-              (-0.24 - Math.cos(workProgress * Math.PI * 4) * 0.1) * workEnvelope,
-              14,
-              dt
-            );
             targetHeadX = 0.24 * workEnvelope;
-            targetHeadY = Math.sin(workProgress * Math.PI * 3) * 0.14 * workEnvelope;
             targetChestGlow = 0.28 + 1.45 * workEnvelope;
             targetVisorGlow = 0.12 + 0.55 * workEnvelope;
           } else {
@@ -794,18 +1070,8 @@ export default function OutpostScene3D({
           }
 
           if (refs.headPivot) {
-            refs.headPivot.rotation.x = THREE.MathUtils.damp(
-              refs.headPivot.rotation.x,
-              targetHeadX,
-              10,
-              dt
-            );
-            refs.headPivot.rotation.y = THREE.MathUtils.damp(
-              refs.headPivot.rotation.y,
-              targetHeadY,
-              10,
-              dt
-            );
+            refs.headPivot.rotation.x = THREE.MathUtils.damp(refs.headPivot.rotation.x, targetHeadX, 10, dt);
+            refs.headPivot.rotation.y = THREE.MathUtils.damp(refs.headPivot.rotation.y, targetHeadY, 10, dt);
           }
           if (refs.chestDisplayMat) {
             refs.chestDisplayMat.emissiveIntensity = THREE.MathUtils.damp(
@@ -826,7 +1092,139 @@ export default function OutpostScene3D({
         }
       });
 
-      // 2. Animate Storm Flue Turbine & Status Beacon
+      if (boundaryWarningActive !== lastBoundaryHit) {
+        lastBoundaryHit = boundaryWarningActive;
+        callbacksRef.current.onBoundaryWarning?.(boundaryWarningActive);
+      }
+
+      // 2. Collision-Free Rover Navigation + Smooth Steering + Obstacle Avoidance + Wheel Spin + Terrain Slope
+      if (!currentState.rover.damaged) {
+        let driveStep = 0;
+        if (isDrivingRover) {
+          const turnRate = 1.9;
+          roverNav.yaw -= rightInput * turnRate * dt;
+          const driveSpeed = fwdInput * 5.4;
+          driveStep = driveSpeed * dt;
+          const rx = roverNav.x + Math.sin(roverNav.yaw) * driveStep;
+          const rz = roverNav.z + Math.cos(roverNav.yaw) * driveStep;
+          const resolved = resolveObstaclesAndPerimeter(rx, rz, 0.95);
+          roverNav.x = resolved.x;
+          roverNav.z = resolved.z;
+          if (resolved.hitBoundary) callbacksRef.current.onBoundaryWarning?.(true);
+        } else {
+          // Autonomous waypoint steering with potential-field obstacle avoidance
+          const wp = ROVER_WAYPOINTS[roverNav.waypointIdx];
+          let steerX = wp.x - roverNav.x;
+          let steerZ = wp.z - roverNav.z;
+          const wpDist = Math.hypot(steerX, steerZ);
+          if (wpDist < 1.6) {
+            roverNav.waypointIdx = (roverNav.waypointIdx + 1) % ROVER_WAYPOINTS.length;
+          }
+          if (wpDist > 0.01) {
+            steerX /= wpDist;
+            steerZ /= wpDist;
+          }
+
+          // Repel smoothly from every building, Storm Flue, Ship, Flag, Astronaut, and Rock
+          const addRepulsion = (ox: number, oz: number, safeDist: number, weight: number) => {
+            const dx = roverNav.x - ox;
+            const dz = roverNav.z - oz;
+            const d = Math.hypot(dx, dz);
+            if (d < safeDist && d > 0.01) {
+              const strength = ((safeDist - d) / safeDist) * weight;
+              steerX += (dx / d) * strength;
+              steerZ += (dz / d) * strength;
+            }
+          };
+
+          for (const b of currentState.buildings) {
+            const bp = getBuildingWorldPos(b.cellIndex);
+            addRepulsion(bp.x, bp.z, 3.6, 2.8);
+          }
+          addRepulsion(STORM_FLUE_POS.x, STORM_FLUE_POS.z, 3.3, 2.6);
+          addRepulsion(SPACESHIP_POS.x, SPACESHIP_POS.z, 4.4, 3.0);
+          for (const ae of astroEntries) {
+            if (!ae.shelteredInside) addRepulsion(ae.x, ae.z, 2.2, 2.5);
+          }
+          for (const rk of currentRockColliders) {
+            addRepulsion(rk.x, rk.z, rk.radius + 2.4, 2.4);
+          }
+          for (const zf of currentZoneFeatures) {
+            if (zf.kind === 'methane_lake') addRepulsion(zf.x, zf.z, zf.radius + 2.4, 3.2);
+          }
+
+          const targetYaw = Math.atan2(steerX, steerZ);
+          let yawDiff = targetYaw - roverNav.yaw;
+          while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
+          while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
+          roverNav.yaw += yawDiff * Math.min(1, dt * 2.8);
+
+          driveStep = roverNav.speed * dt;
+          const rx = roverNav.x + Math.sin(roverNav.yaw) * driveStep;
+          const rz = roverNav.z + Math.cos(roverNav.yaw) * driveStep;
+          const resolved = resolveObstaclesAndPerimeter(rx, rz, 0.95);
+          roverNav.x = resolved.x;
+          roverNav.z = resolved.z;
+        }
+
+        const ry = groundHeightAt(planetId, roverNav.x, roverNav.z);
+        const fSampleY = groundHeightAt(
+          planetId,
+          roverNav.x + Math.sin(roverNav.yaw) * 0.75,
+          roverNav.z + Math.cos(roverNav.yaw) * 0.75
+        );
+        const rSampleY = groundHeightAt(
+          planetId,
+          roverNav.x + Math.cos(roverNav.yaw) * 0.65,
+          roverNav.z - Math.sin(roverNav.yaw) * 0.65
+        );
+        roverGroup.position.set(roverNav.x, ry, roverNav.z);
+        roverGroup.rotation.order = 'YXZ';
+        roverGroup.rotation.set(
+          Math.atan2(ry - fSampleY, 0.75) * 0.85,
+          roverNav.yaw,
+          Math.atan2(ry - rSampleY, 0.65) * 0.7
+        );
+
+        const roverRefs = roverGroup.userData.roverRefs;
+        if (roverRefs?.wheelRefs) {
+          roverNav.wheelSpin += driveStep / 0.24;
+          roverRefs.wheelRefs.forEach((wPivot: THREE.Group) => {
+            wPivot.rotation.x = roverNav.wheelSpin;
+          });
+        }
+      }
+
+      // 3. Animate Titan Dragonfly Drone / Europa Cryo-Drill / Flag cloth / Storm Flue / Starship
+      if (planetId === 'titan') {
+        const dAng = elapsed * 0.35;
+        const dx = Math.sin(dAng) * 11.5;
+        const dz = Math.sin(dAng * 2) * 7.5 + 2.0;
+        const dy = groundHeightAt('titan', dx, dz) + 4.4 + Math.sin(elapsed * 2.1) * 0.4;
+        titanDrone.position.set(dx, dy, dz);
+        titanDrone.rotation.y = Math.atan2(Math.cos(dAng) * 11.5, Math.cos(dAng * 2) * 15);
+        const dRefs = titanDrone.userData.droneRefs;
+        if (dRefs?.rotors) {
+          dRefs.rotors.forEach((r: THREE.Group, idx: number) => {
+            r.rotation.y += dt * (idx % 2 === 0 ? 28 : -28);
+          });
+        }
+      }
+
+      if (planetId === 'europa') {
+        const pRefs = europaProbe.userData.probeRefs;
+        if (pRefs?.drillShaft) {
+          pRefs.drillShaft.rotation.y += dt * 4.5;
+          pRefs.drillShaft.position.y = 0.72 + Math.sin(elapsed * 5) * 0.08;
+        }
+      }
+
+      if (plantedFlagGroup.visible && plantedFlagGroup.userData.plantedFlagRefs?.flagPivot) {
+        const breezeSpeed = planetId === 'moon' || planetId === 'europa' ? 1.8 : 3.6;
+        plantedFlagGroup.userData.plantedFlagRefs.flagPivot.rotation.y =
+          Math.sin(elapsed * breezeSpeed) * 0.16;
+      }
+
       const flueRefs = stormFlueGroup.userData.stormFlueRefs;
       if (flueRefs) {
         const spinRate = Math.max(0.4, 5.5 * (1 - currentState.stormFlue.cloggedPct / 110));
@@ -841,7 +1239,6 @@ export default function OutpostScene3D({
         flueRefs.beaconMat.emissive.setHex(statusHex);
       }
 
-      // 3. Animate Planetary Data Scan Rings
       dataNodesGroup.children.forEach((nodeObj, idx) => {
         const nodeRefs = nodeObj.userData.nodeRefs;
         if (nodeRefs) {
@@ -850,28 +1247,34 @@ export default function OutpostScene3D({
         }
       });
 
-      // 4. Animate Autonomous Rover along base perimeter & NASA Spaceship Pakistan Flag
-      const roverAngle = elapsed * 0.14;
-      const rx = Math.cos(roverAngle) * 8.3;
-      const rz = Math.sin(roverAngle) * 8.3;
-      const ry = groundHeightAt(planetId, rx, rz);
-      roverGroup.position.set(rx, ry, rz);
-      roverGroup.rotation.y = -roverAngle;
-
       const shipRefs = spaceshipGroup.userData.spaceshipRefs;
       if (shipRefs) {
         shipRefs.beaconMat.emissiveIntensity = 0.75 + 0.65 * Math.sin(elapsed * 3.1);
       }
 
-      // 4b. Live Outpost Storm Particles & Dynamic Fog Density when storm/flue alert is active
+      // 4. Deep Sky Meteors + Solar Eclipse Dimming + Surface Weather Particles
+      const eclipseFactor = planetId === 'moon' && currentState.lunarState.eclipseActive ? 1 : 0;
+      currentTerrainBundle?.updateSkyEffects(elapsed, dt, {
+        eclipseFactor,
+        earthVisPct: currentState.comms.earthVisibilityPct,
+      });
+
       const evtId = currentState.activeEvent?.id;
       const isStormActive =
+        currentState.shelterRefugeActive ||
         currentState.stormFlue.cloggedPct >= 55 ||
         evtId === 'dust_storm' ||
         evtId === 'storm_flue_clog' ||
-        evtId === 'cryo_plume';
+        evtId === 'europa_cryo_surge';
       const baseSpec = getPlanetEnvironmentSpec(planetId);
-      const targetStormAlpha = isStormActive ? 0.58 : 0;
+
+      // Smooth Sun/Hemi intensity with Lunar Solar Eclipse
+      const targetSunInt = baseSpec.sunIntensity * (1 - eclipseFactor * 0.84) * (isStormActive ? 0.62 : 1.0);
+      const targetHemiInt = baseSpec.hemiIntensity * (1 - eclipseFactor * 0.55);
+      sunLight.intensity = THREE.MathUtils.damp(sunLight.intensity, targetSunInt, 2.5, dt);
+      hemiLight.intensity = THREE.MathUtils.damp(hemiLight.intensity, targetHemiInt, 2.5, dt);
+
+      const targetStormAlpha = isStormActive ? 0.62 : planetId === 'titan' ? 0.25 : 0;
       stormMat.opacity = THREE.MathUtils.damp(stormMat.opacity, targetStormAlpha, 3.5, dt);
       if (scene.fog instanceof THREE.FogExp2) {
         const targetFog = isStormActive ? baseSpec.fogDensity * 1.9 : baseSpec.fogDensity;
@@ -888,38 +1291,59 @@ export default function OutpostScene3D({
             : 0xcbd5e1;
         stormMat.color.setHex(stormHex);
         const sAttr = stormGeo.attributes.position as THREE.BufferAttribute;
+        const fallDown = planetId === 'titan'; // Methane rain on Titan!
         for (let i = 0; i < stormCount; i++) {
-          let sx = stormPos[i * 3] + 15.5 * dt;
-          let sz = stormPos[i * 3 + 2] + 6.5 * dt;
+          let sx = stormPos[i * 3] + (fallDown ? 4.5 : 15.5) * dt;
+          let sy = stormPos[i * 3 + 1] + (fallDown ? -7.5 : 0) * dt;
+          let sz = stormPos[i * 3 + 2] + (fallDown ? 1.5 : 6.5) * dt;
           if (sx > 22) sx -= 44;
           if (sz > 20) sz -= 40;
+          if (sy < 0.2) sy = 12;
           stormPos[i * 3] = sx;
+          stormPos[i * 3 + 1] = sy;
           stormPos[i * 3 + 2] = sz;
         }
         sAttr.needsUpdate = true;
       }
 
-      // 5. Camera Follow / Overview Tracking
-      if (cameraModeRef.current === 'follow') {
-        _desiredTarget.set(
-          activeEntry.x,
-          activeEntry.mesh.position.y + 1.15,
-          activeEntry.z
+      // 5. Camera Modes: First-Person Visor POV vs Follow vs Overview
+      const camMode = cameraModeRef.current;
+      if (camMode === 'first_person') {
+        controls.enabled = false;
+        const bob = activeMoving && activeEntry.grounded ? Math.sin(activeEntry.walkPhase * 2) * 0.03 : 0;
+        _fpEye.set(
+          activeEntry.x + Math.sin(fpYaw) * 0.14,
+          activeEntry.mesh.position.y + 1.56 + bob,
+          activeEntry.z + Math.cos(fpYaw) * 0.14
         );
-        _targetDelta.subVectors(_desiredTarget, controls.target).multiplyScalar(Math.min(1, dt * 6));
-        controls.target.add(_targetDelta);
-        camera.position.add(_targetDelta);
+        camera.position.x = THREE.MathUtils.damp(camera.position.x, _fpEye.x, 18, dt);
+        camera.position.y = THREE.MathUtils.damp(camera.position.y, _fpEye.y, 18, dt);
+        camera.position.z = THREE.MathUtils.damp(camera.position.z, _fpEye.z, 18, dt);
+        _fpLook.set(
+          camera.position.x + Math.sin(fpYaw) * Math.cos(fpPitch) * 6,
+          camera.position.y + Math.sin(fpPitch) * 6,
+          camera.position.z + Math.cos(fpYaw) * Math.cos(fpPitch) * 6
+        );
+        camera.lookAt(_fpLook);
+      } else {
+        controls.enabled = true;
+        if (camMode === 'follow') {
+          const focusX = isDrivingRover ? roverNav.x : activeEntry.x;
+          const focusY = isDrivingRover ? roverGroup.position.y + 1.0 : activeEntry.mesh.position.y + 1.15;
+          const focusZ = isDrivingRover ? roverNav.z : activeEntry.z;
+          _desiredTarget.set(focusX, focusY, focusZ);
+          _targetDelta.subVectors(_desiredTarget, controls.target).multiplyScalar(Math.min(1, dt * 6));
+          controls.target.add(_targetDelta);
+          camera.position.add(_targetDelta);
+        }
+        controls.update();
       }
-      controls.update();
 
-      // 6. Proximity Target Detection for [E] NASA Work
+      // 6. Proximity Target Detection
       let closestTarget: NearbyTarget | null = null;
       let bestDist = Infinity;
 
-      const flueDist = Math.hypot(
-        activeEntry.x - STORM_FLUE_POS.x,
-        activeEntry.z - STORM_FLUE_POS.z
-      );
+      const flueDist = Math.hypot(activeEntry.x - STORM_FLUE_POS.x, activeEntry.z - STORM_FLUE_POS.z);
       if (flueDist < 3.7) {
         bestDist = flueDist;
         closestTarget = {
@@ -927,7 +1351,19 @@ export default function OutpostScene3D({
           id: 'storm_flue',
           label: 'Outpost Storm Flue',
           sublabel: `Clog ${currentState.stormFlue.cloggedPct}% · ${currentState.stormFlue.pressureKpa} kPa`,
-          actionLabel: 'Inspect & Clear Storm Flue',
+          actionLabel: 'Inspect Storm Flue',
+        };
+      }
+
+      const shipDist = Math.hypot(activeEntry.x - SPACESHIP_POS.x, activeEntry.z - SPACESHIP_POS.z);
+      if (shipDist < 4.5 && shipDist < bestDist) {
+        bestDist = shipDist;
+        closestTarget = {
+          kind: 'spaceship',
+          id: 'spaceship',
+          label: 'NASA Expedition Starship',
+          sublabel: `Ship Propellant ${currentState.fuel.shipTankPct}% · Outpost Reserve ${currentState.fuel.current}%`,
+          actionLabel: 'Open Fuel & Propellant Bay',
         };
       }
 
@@ -957,12 +1393,16 @@ export default function OutpostScene3D({
             kind: 'building',
             id: b.uid,
             label: `${def?.shortName || b.typeId} (Lv ${b.level})`,
-            sublabel: doneToday
-              ? `${activeAstro.name} completed NASA shift today`
+            sublabel: b.damaged
+              ? `DAMAGED (${b.conditionPct}%) — Needs Spare Parts`
+              : doneToday
+              ? `${activeAstro.name} completed shift today`
               : activeAstro.taskTitle,
-            actionLabel: doneToday
+            actionLabel: b.damaged
+              ? 'Inspect Damage'
+              : doneToday
               ? 'Inspect Module'
-              : `Run ${activeAstro.name}'s NASA Maintenance`,
+              : `Run ${activeAstro.name}'s Shift`,
           };
         }
       }
@@ -976,13 +1416,28 @@ export default function OutpostScene3D({
         callbacksRef.current.onProximityChange(closestTarget);
       }
 
-      // 7. Render 3D Frame
+      // Throttled 2D minimap coordinate sync
+      posUpdateCooldown -= dt;
+      if (posUpdateCooldown <= 0 && callbacksRef.current.onPositionUpdate) {
+        posUpdateCooldown = 0.25;
+        callbacksRef.current.onPositionUpdate({
+          astronauts: astroEntries.map((ae) => ({ id: ae.profile.id, x: ae.x, z: ae.z })),
+          rover: { x: roverNav.x, z: roverNav.z, yaw: roverNav.yaw },
+        });
+      }
+
+      // 7. Render
       renderer.render(scene, camera);
 
-      // 8. Project 3D Floating Nameplates cleanly to DOM
+      // 8. Project Floating Labels
       const w = container.clientWidth || 800;
       const h = container.clientHeight || 600;
       astroEntries.forEach((entry) => {
+        if (!entry.mesh.visible) {
+          const el = labelRefs.current[`astro-${entry.profile.id}`];
+          if (el) el.style.opacity = '0';
+          return;
+        }
         projectLabelToScreen(
           `astro-${entry.profile.id}`,
           entry.x,
@@ -992,7 +1447,14 @@ export default function OutpostScene3D({
           h
         );
       });
-      projectLabelToScreen('storm-flue', STORM_FLUE_POS.x, 4.1, STORM_FLUE_POS.z, w, h);
+      projectLabelToScreen(
+        'storm-flue',
+        STORM_FLUE_POS.x,
+        stormFlueGroup.position.y + 4.1,
+        STORM_FLUE_POS.z,
+        w,
+        h
+      );
       projectLabelToScreen(
         'nasa-spaceship',
         SPACESHIP_POS.x,
@@ -1001,6 +1463,20 @@ export default function OutpostScene3D({
         w,
         h
       );
+      const curFlag = currentState.flagsByWorld[planetId];
+      if (curFlag?.planted) {
+        projectLabelToScreen(
+          'planted-flag',
+          curFlag.x,
+          plantedFlagGroup.position.y + 3.1,
+          curFlag.z,
+          w,
+          h
+        );
+      } else {
+        const el = labelRefs.current['planted-flag'];
+        if (el) el.style.opacity = '0';
+      }
       currentState.dataNodes.forEach((node) => {
         const ny = groundHeightAt(planetId, node.x, node.z);
         projectLabelToScreen(`node-${node.id}`, node.x, ny + 2.25, node.z, w, h);
@@ -1018,24 +1494,29 @@ export default function OutpostScene3D({
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+      renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
       resizeObserver.disconnect();
 
-      if (currentTerrainCleanup) currentTerrainCleanup();
-      spaceshipGroup.traverse((obj) => {
-        const mesh = obj as THREE.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        if (mesh.material) {
-          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-          mats.forEach((m) => {
-            const std = m as THREE.MeshStandardMaterial;
-            if (std.map && std.map !== shadowTex && std.map !== solarTex) std.map.dispose();
-            m.dispose();
+      if (currentTerrainBundle) currentTerrainBundle.dispose();
+      [spaceshipGroup, plantedFlagGroup, roverGroup, stormFlueGroup, titanDrone, europaProbe].forEach(
+        (grp) => {
+          grp.traverse((obj) => {
+            const mesh = obj as THREE.Mesh;
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) {
+              const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+              mats.forEach((m) => {
+                const std = m as THREE.MeshStandardMaterial;
+                if (std.map && std.map !== shadowTex && std.map !== solarTex) std.map.dispose();
+                m.dispose();
+              });
+            }
           });
         }
-      });
+      );
       stormGeo.dispose();
       stormMat.dispose();
       shadowTex.dispose();
@@ -1051,26 +1532,28 @@ export default function OutpostScene3D({
     };
   }, []);
 
-  // Sync planetary environment, buildings, and nodes without rebuilding WebGL context
   useEffect(() => {
     syncActionsRef.current?.syncPlanet(state.planetId);
     syncActionsRef.current?.syncBuildings();
     syncActionsRef.current?.syncDataNodes();
-  }, [state.planetId, state.buildings, state.dataNodes]);
+    syncActionsRef.current?.syncFlag();
+  }, [state.planetId, state.buildings, state.dataNodes, state.flagsByWorld]);
 
   useEffect(() => {
     syncActionsRef.current?.focusAstronaut(state.activeAstronautId);
   }, [state.activeAstronautId, cameraMode]);
 
+  const activeFlag = state.flagsByWorld[state.planetId];
+
   return (
     <div className="relative w-full h-full overflow-hidden select-none">
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
-      {/* Projected 3D Labels (Direct Transform Updates, No Backdrop Blur) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {ASTRONAUTS.map((astro) => {
           const isActive = state.activeAstronautId === astro.id;
           const done = state.crewProgress[astro.id]?.currentTaskDone;
+          const hasMed = state.crewVitals[astro.id]?.medicalAlert;
           return (
             <div
               key={astro.id}
@@ -1079,7 +1562,9 @@ export default function OutpostScene3D({
               }}
               style={{ opacity: 0 }}
               className={`absolute top-0 left-0 px-2 py-0.5 rounded border text-[11px] font-mono whitespace-nowrap transition-colors ${
-                isActive
+                hasMed
+                  ? 'bg-rose-950/95 border-rose-400 text-rose-100 font-bold'
+                  : isActive
                   ? 'bg-[#0F1623]/95 border-sky-400 text-white font-bold'
                   : 'bg-[#07090E]/85 border-slate-700 text-slate-200'
               }`}
@@ -1090,6 +1575,7 @@ export default function OutpostScene3D({
               />
               {astro.name}
               {done && <span className="ml-1 text-emerald-400">✓</span>}
+              {hasMed && <span className="ml-1 text-rose-300">✚</span>}
             </div>
           );
         })}
@@ -1117,7 +1603,17 @@ export default function OutpostScene3D({
           style={{ opacity: 0 }}
           className="absolute top-0 left-0 px-2 py-0.5 rounded border border-emerald-500/60 bg-[#07090E]/90 text-[10px] font-mono text-emerald-300 whitespace-nowrap"
         >
-          NASA Starship
+          NASA Starship · Fuel {state.fuel.shipTankPct}%
+        </div>
+
+        <div
+          ref={(el) => {
+            labelRefs.current['planted-flag'] = el;
+          }}
+          style={{ opacity: 0 }}
+          className="absolute top-0 left-0 px-2 py-0.5 rounded border border-emerald-400/70 bg-emerald-950/90 text-[10px] font-mono text-emerald-200 whitespace-nowrap"
+        >
+          ⚑ {activeFlag?.siteLabel || 'Expedition Flag'}
         </div>
 
         {state.dataNodes.map((node) => (

@@ -74,7 +74,8 @@ export default function Briefing({
               </h1>
               <p className="text-sm text-slate-400 mt-1">
                 Commander: <span className="text-white font-medium">{config.playerName}</span> ·
-                Difficulty: <span className="text-sky-300 font-medium">{difficulty.name}</span> ·
+                Gravity: <span className="text-sky-300 font-mono">{planet.gravityMs2} m/s²</span> ·
+                Atmo: <span className="text-slate-200 font-mono">{planet.atmosphereKpa} kPa</span> ·
                 Duration:{' '}
                 <span className="text-white font-mono tabular-nums">
                   {config.missionDays} Days
@@ -98,9 +99,9 @@ export default function Briefing({
               </div>
               <p className="text-sm text-slate-300 leading-relaxed">
                 Establish a functioning {planet.name.toLowerCase()} outpost, keep{' '}
-                <strong className="text-white">all 6 astronauts</strong> safe for{' '}
-                <strong className="text-white">{config.missionDays} simulated days</strong>, inspect
-                the Storm Flue, and collect planetary data nodes.
+                <strong className="text-white">all 6 astronauts</strong> healthy for{' '}
+                <strong className="text-white">{config.missionDays} simulated days</strong>, maintain
+                comms &amp; fuel, plant your expedition flag, and gather planetary data.
               </p>
             </div>
 
@@ -109,10 +110,10 @@ export default function Briefing({
                 <AlertCircle className="w-4 h-4" /> Mission Constraints
               </div>
               <ul className="text-sm text-slate-300 space-y-1.5">
-                <li>· Limited construction budget ({difficulty.budget} credits)</li>
-                <li>· Finite starting oxygen, water, and food reserves</li>
-                <li>· Storm flue clogs &amp; dust/cryo hazards</li>
-                <li>· Finite electrical generation and storage</li>
+                <li>· Strict budget ({difficulty.budget} credits) &amp; finite spare parts</li>
+                <li>· Medical alerts (dehydration, fatigue, illness) need treatment</li>
+                <li>· Severe storms trigger crew refuge &amp; persistent structural damage</li>
+                <li>· Keep Starship fueled before flying to unvisited worlds</li>
               </ul>
             </div>
 
@@ -122,7 +123,7 @@ export default function Briefing({
               </div>
               <ul className="text-sm text-slate-300 space-y-1.5">
                 <li>· Keep critical life-support systems above 0%</li>
-                <li>· Control crew radiation exposure</li>
+                <li>· Repair comms disruptions &amp; inspect post-storm damage</li>
                 <li>· Switch between all 6 astronauts in 3D to finish NASA tasks</li>
                 <li>· Collect surface data across deployed worlds</li>
               </ul>
@@ -142,7 +143,7 @@ export default function Briefing({
               </h2>
             </div>
             <span className="text-xs font-mono text-slate-400">
-              Move: WASD / Arrows · Interact: [E] or Click
+              Move: WASD / Arrows · Jump: [Space] · Interact: [E] or Click
             </span>
           </div>
 

@@ -143,6 +143,25 @@ export default function PlanetSelection({
                       {planet.summary}
                     </p>
 
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-[11px] font-mono">
+                      <div className="p-2 rounded bg-space-950 border border-slate-800">
+                        <span className="text-slate-400 block">Gravity</span>
+                        <strong className="text-sky-300">{planet.gravityMs2} m/s²</strong>
+                      </div>
+                      <div className="p-2 rounded bg-space-950 border border-slate-800">
+                        <span className="text-slate-400 block">Atmo</span>
+                        <strong className="text-white">{planet.atmosphereKpa} kPa</strong>
+                      </div>
+                      <div className="p-2 rounded bg-space-950 border border-slate-800">
+                        <span className="text-slate-400 block">Temp</span>
+                        <strong className="text-amber-300">{planet.tempRangeC}</strong>
+                      </div>
+                      <div className="p-2 rounded bg-space-950 border border-slate-800">
+                        <span className="text-slate-400 block">Resupply</span>
+                        <strong className="text-emerald-300">{planet.resupplyDays}d transit</strong>
+                      </div>
+                    </div>
+
                     <div className="mb-4 p-3 rounded-lg bg-space-950 border border-slate-800 flex items-start gap-2.5">
                       <Compass className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                       <div className="text-xs">
