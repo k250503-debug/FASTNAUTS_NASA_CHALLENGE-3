@@ -6,15 +6,18 @@ import {
   Compass,
   Shield,
   Sun,
+  User,
   Users,
   Wind,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { ASTRONAUTS } from '../data/astronauts';
-import { PLANETS } from '../data/planets';
-import type { PlanetId } from '../types';
+import { DIFFICULTIES, MISSION_LENGTHS, PLANETS } from '../data/planets';
+import type { DifficultyId, MissionConfig, PlanetId } from '../types';
 
 interface PlanetSelectionProps {
+  config?: MissionConfig;
+  onUpdateConfig?: (partial: Partial<MissionConfig>) => void;
   onSelectPlanet: (planetId: PlanetId) => void;
   onBack: () => void;
   onGoHome: () => void;
@@ -41,41 +44,124 @@ const PLANET_SPHERE_STYLES: Record<PlanetId, { orb: string; ring?: string; glow:
 };
 
 export default function PlanetSelection({
+  config,
+  onUpdateConfig,
   onSelectPlanet,
   onBack,
   onGoHome,
 }: PlanetSelectionProps) {
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  const playerName = config?.playerName ?? '';
+  const difficulty: DifficultyId = config?.difficulty ?? 'engineer';
+  const missionDays = config?.missionDays ?? 30;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#07090E] hud-grid">
       <Navbar
         showLandingNav={false}
         onGoHome={onGoHome}
-        stepText="Step 2 of 4 · NASA Destination Selection"
+        stepText="Step 1 of 3 · Select Destination"
       />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-10">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-6 transition-colors"
+          className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-5 transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to Commander Setup
+          <ArrowLeft className="w-4 h-4" /> Back to Universe View
         </button>
 
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="text-xs font-mono uppercase tracking-wider text-sky-400 mb-1">
-            NASA Planetary &amp; Lunar Targets
+            Planetary &amp; Lunar Targets
           </div>
           <h1 className="font-display text-3xl sm:text-4xl font-bold text-white">
-            Choose Your Initial Landing World
+            Select Your Expedition World
           </h1>
-          <p className="text-slate-400 mt-1">
-            All 6 astronauts deploy together and can redeploy between The Moon, Mars, Titan, and
-            Europa during the 3D mission to fulfill NASA data &amp; storm-flue requirements.
+          <p className="text-slate-400 mt-1 max-w-2xl">
+            Click a destination to immediately configure your outpost modules and construction budget
+            for that world.
           </p>
         </div>
+
+        {/* Compact Commander Callsign, Difficulty & Duration Bar */}
+        {onUpdateConfig && (
+          <section className="mb-7 rounded-xl bg-space-900 border border-slate-800 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 rounded-lg bg-sky-500/15 border border-sky-500/40 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4 text-sky-400" />
+              </div>
+              <div className="flex-1 min-w-0 max-w-xs">
+                <label
+                  htmlFor="commander-callsign"
+                  className="block text-[11px] font-mono text-slate-400 mb-1"
+                >
+                  Commander Callsign
+                </label>
+                <input
+                  id="commander-callsign"
+                  type="text"
+                  maxLength={24}
+                  value={playerName}
+                  placeholder="Commander"
+                  onChange={(e) => onUpdateConfig({ playerName: e.target.value })}
+                  className="w-full px-3 py-1.5 rounded-lg bg-[#07090E] border border-slate-700 focus:border-sky-400 focus:outline-none text-sm text-white placeholder:text-slate-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4">
+              <div>
+                <div className="text-[11px] font-mono text-slate-400 mb-1">
+                  Difficulty &amp; Budget
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {DIFFICULTIES.map((diff) => {
+                    const active = difficulty === diff.id;
+                    return (
+                      <button
+                        key={diff.id}
+                        type="button"
+                        onClick={() => onUpdateConfig({ difficulty: diff.id })}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-mono transition-colors whitespace-nowrap ${
+                          active
+                            ? 'bg-sky-500/20 border-sky-400 text-white font-semibold'
+                            : 'bg-[#07090E] border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {diff.name} · {diff.budget} CR
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] font-mono text-slate-400 mb-1">Duration</div>
+                <div className="flex items-center gap-1.5">
+                  {MISSION_LENGTHS.map((opt) => {
+                    const active = missionDays === opt.days;
+                    return (
+                      <button
+                        key={opt.days}
+                        type="button"
+                        onClick={() => onUpdateConfig({ missionDays: opt.days })}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-mono tabular-nums transition-colors whitespace-nowrap ${
+                          active
+                            ? 'bg-emerald-500/20 border-emerald-400 text-white font-semibold'
+                            : 'bg-[#07090E] border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
           {PLANETS.map((planet) => {
@@ -105,8 +191,18 @@ export default function PlanetSelection({
                     ) : (
                       <div className="w-full h-full flex items-center justify-center relative bg-gradient-to-b from-[#070B14] to-[#0B1220]">
                         <div
-                          className={`w-28 h-28 rounded-full ${sphereStyle.orb} ${sphereStyle.glow} relative`}
+                          className={`w-28 h-28 rounded-full ${sphereStyle.orb} ${sphereStyle.glow} relative overflow-hidden`}
                         >
+                          {planet.id === 'europa' && (
+                            <div
+                              aria-hidden="true"
+                              className="absolute inset-0 opacity-45"
+                              style={{
+                                backgroundImage:
+                                  'repeating-linear-gradient(28deg, transparent 0px, transparent 10px, rgba(154,52,18,0.65) 11px, transparent 13px)',
+                              }}
+                            />
+                          )}
                           {sphereStyle.ring && (
                             <div
                               className={`absolute -inset-x-9 top-1/2 -translate-y-1/2 h-9 rounded-full border-4 ${sphereStyle.ring} rotate-[-16deg] pointer-events-none`}
@@ -117,7 +213,7 @@ export default function PlanetSelection({
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-space-900 via-space-900/25 to-transparent" />
 
-                    <div className="absolute top-3 right-4 px-2.5 py-1 rounded bg-[#07090E]/90 border border-slate-700 text-[11px] font-mono text-slate-200">
+                    <div className="absolute top-3 right-4 px-2.5 py-1 rounded bg-[#07090E]/90 border border-slate-700 text-[11px] font-mono text-slate-200 tabular-nums">
                       {planet.bodyType} · Solar {Math.round(planet.solarEfficiency * 100)}%
                     </div>
 
@@ -143,7 +239,7 @@ export default function PlanetSelection({
                       {planet.summary}
                     </p>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-[11px] font-mono">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-[11px] font-mono tabular-nums">
                       <div className="p-2 rounded bg-space-950 border border-slate-800">
                         <span className="text-slate-400 block">Gravity</span>
                         <strong className="text-sky-300">{planet.gravityMs2} m/s²</strong>
@@ -166,7 +262,7 @@ export default function PlanetSelection({
                       <Compass className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                       <div className="text-xs">
                         <span className="font-mono uppercase text-sky-400 block mb-0.5">
-                          NASA Requirement
+                          Expedition Goal
                         </span>
                         <span className="text-slate-200">{planet.nasaGoal}</span>
                       </div>
@@ -180,10 +276,10 @@ export default function PlanetSelection({
                         {assignedCrew.map((a) => (
                           <span
                             key={a.id}
-                            className="px-2 py-0.5 rounded bg-space-950 border border-slate-700 text-slate-200 font-medium"
+                            className="text-slate-200 font-medium flex items-center gap-1.5"
                           >
                             <span
-                              className="inline-block w-2 h-2 rounded-full mr-1.5"
+                              className="inline-block w-2 h-2 rounded-full"
                               style={{ backgroundColor: a.suitColor }}
                             />
                             {a.name}
@@ -221,7 +317,7 @@ export default function PlanetSelection({
                     <div className="p-4 rounded-lg bg-space-950 border border-slate-800">
                       <div className="text-xs font-mono uppercase tracking-wider text-amber-400 mb-2 flex items-center gap-1.5">
                         <AlertTriangle className="w-3.5 h-3.5" />
-                        Special Engineering Challenges
+                        Engineering Challenges
                       </div>
                       <ul className="space-y-1.5 text-xs text-slate-300">
                         {planet.challenges.map((ch, idx) => (
@@ -245,7 +341,7 @@ export default function PlanetSelection({
                         : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
                     }`}
                   >
-                    Deploy to {planet.name}
+                    Build Outpost on {planet.name}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>

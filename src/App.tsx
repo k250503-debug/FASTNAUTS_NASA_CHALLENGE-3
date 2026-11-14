@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import Landing from './pages/Landing';
+import { AnimatePresence, motion } from 'motion/react';
+import UniverseExperience from './pages/UniverseExperience';
 import PlayerSetup from './pages/PlayerSetup';
 import PlanetSelection from './pages/PlanetSelection';
 import Briefing from './pages/Briefing';
@@ -7,8 +8,12 @@ import BaseBuilder from './pages/BaseBuilder';
 import MissionControl from './pages/MissionControl';
 import EmergencyCenter from './pages/EmergencyCenter';
 import MissionReport from './pages/MissionReport';
+import EquipmentShowcaseModal from './components/EquipmentShowcaseModal';
+import AstronautGalleryModal from './components/AstronautGalleryModal';
+import type { UniverseExperienceMode } from './three/UniverseScene3D';
 import {
   clearSavedMission,
+  createDefaultCrewCustomizations,
   createInitialMissionState,
   getWorldDataNodes,
   grantAchievement,
@@ -21,18 +26,22 @@ import { simulateNextDay } from './simulation/calculations';
 import { applyEngineeringDecision } from './simulation/decisions';
 import { getAstronautById } from './data/astronauts';
 import { getBuildingDef } from './data/buildings';
+import { getEquipmentById } from './data/equipment';
 import { getPlanetById } from './data/planets';
 import {
   COMMS_FAULTS,
   getSparePartDef,
   MEDICAL_CONDITIONS,
 } from './data/systems';
+import CinematicStoryScene from './three/CinematicStoryScene';
 import MissionLaunchScene, { type FlagLandingChoice } from './three/MissionLaunchScene';
 import StormArrivalScene from './three/StormArrivalScene';
 import type {
+  AstronautCustomization,
   AstronautId,
   BuildingTypeId,
   ConstructionMaterialId,
+  EquipmentId,
   EventChoice,
   MissionConfig,
   MissionState,
@@ -45,12 +54,19 @@ import type {
 
 export default function App() {
   const [screen, setScreen] = useState<ScreenId>('landing');
-  const [missionConfig, setMissionConfig] = useState<MissionConfig>({
+  const [universeMode, setUniverseMode] = useState<UniverseExperienceMode>('journey');
+  const [missionConfig, setMissionConfig] = useState<MissionConfig>(() => ({
     playerName: '',
     difficulty: 'engineer',
     missionDays: 30,
-    planetId: 'moon',
-  });
+    planetId: 'mars',
+    selectedCommanderId: 'abubakr',
+    crewCustomizations: createDefaultCrewCustomizations(),
+    preselectedEquipment: ['solar_array', 'solar_water_cycle'],
+  }));
+  const [preMissionModal, setPreMissionModal] = useState<'equipment' | 'astronauts' | null>(null);
+  const [draftBuildings, setDraftBuildings] = useState<PlacedBuilding[]>([]);
+  const [draftRemainingBudget, setDraftRemainingBudget] = useState<number>(1150);
   const [simState, setSimState] = useState<MissionState | null>(null);
   const [launchStartStage, setLaunchStartStage] = useState<'boarding' | 'transit'>('boarding');
   const [isAudioMuted, setIsAudioMuted] = useState(false);
@@ -174,7 +190,7 @@ export default function App() {
       };
     };
 
-    if (screen === 'mission' && !isAudioMuted) startAmbientHum();
+    if ((screen === 'mission' || screen === 'landing') && !isAudioMuted) startAmbientHum();
     else stopAmbientHum();
 
     return () => {
@@ -182,7 +198,10 @@ export default function App() {
     };
   }, [screen, isAudioMuted]);
 
-  const handleGoHome = () => setScreen('landing');
+  const handleGoHome = () => {
+    setUniverseMode('interactive');
+    setScreen('landing');
+  };
 
   const handleResumeMission = () => {
     const loaded = loadSavedMission();
@@ -1193,164 +1212,370 @@ export default function App() {
   const handlePlayAgain = () => {
     clearSavedMission();
     setSavedAvailable(false);
+    setDraftBuildings([]);
     setSimState(null);
-    setScreen('setup');
+    setScreen('planet');
   };
 
   const handleCompareOtherPlanet = (otherPlanetId: PlanetId) => {
     setMissionConfig((prev) => ({ ...prev, planetId: otherPlanetId }));
+    setDraftBuildings([]);
     setSimState(null);
-    setScreen('briefing');
+    setScreen('builder');
   };
 
-  if (screen === 'landing') {
+  const handleAddEquipmentToInventory = (id: EquipmentId) => {
+    const item = getEquipmentById(id);
+    setSimState((prev) => {
+      if (!prev) return prev;
+      const alreadyOwned = prev.equipmentInventory.includes(id);
+      const nextInventory = alreadyOwned
+        ? prev.equipmentInventory
+        : [...prev.equipmentInventory, id];
+
+      const nextResources = {
+        ...prev.resources,
+        oxygen: { ...prev.resources.oxygen },
+        water: { ...prev.resources.water },
+        battery: { ...prev.resources.battery },
+      };
+      const nextTech = { ...prev.techUpgrades };
+      const nextSpareParts = { ...prev.spareParts };
+      const nextFuel = { ...prev.fuel };
+      const nextRover = { ...prev.rover };
+      const nextComms = { ...prev.comms };
+      let nextScience = prev.sciencePoints;
+
+      if (id === 'solar_array') {
+        nextResources.battery.current = Math.min(
+          nextResources.battery.max,
+          nextResources.battery.current + (alreadyOwned ? 4 : 12)
+        );
+        if (!alreadyOwned) nextTech.solarEfficiencyBonus += 0.04;
+      } else if (id === 'solar_water_cycle') {
+        nextResources.water.current = Math.min(
+          100,
+          nextResources.water.current + (alreadyOwned ? 4 : 10)
+        );
+        if (!alreadyOwned) nextTech.waterEfficiencyBonus += 0.05;
+      } else if (id === 'water_collector') {
+        nextResources.water.current = Math.min(
+          100,
+          nextResources.water.current + (alreadyOwned ? 4 : 12)
+        );
+        nextFuel.current = Math.min(nextFuel.max, nextFuel.current + (alreadyOwned ? 3 : 10));
+      } else if (id === 'oxygen_generator') {
+        nextResources.oxygen.current = Math.min(
+          100,
+          nextResources.oxygen.current + (alreadyOwned ? 4 : 12)
+        );
+        if (!alreadyOwned) nextSpareParts.filters += 1;
+      } else if (id === 'exploration_rover') {
+        nextRover.chargePct = 100;
+        if (!alreadyOwned) nextSpareParts.mechanical_parts += 1;
+      } else if (id === 'comms_array') {
+        nextComms.signalStrengthPct = Math.min(
+          100,
+          nextComms.signalStrengthPct + (alreadyOwned ? 6 : 18)
+        );
+        if (!alreadyOwned) nextSpareParts.antenna_components += 1;
+      } else if (id === 'science_spectrometer') {
+        nextScience += alreadyOwned ? 5 : 18;
+        if (!alreadyOwned) nextSpareParts.circuit_boards += 1;
+      }
+
+      return {
+        ...prev,
+        sciencePoints: nextScience,
+        equipmentInventory: nextInventory,
+        resources: nextResources,
+        techUpgrades: nextTech,
+        spareParts: nextSpareParts,
+        fuel: nextFuel,
+        rover: nextRover,
+        comms: nextComms,
+        activityLog: [
+          {
+            id: `eq-${id}-${Date.now()}`,
+            day: prev.day,
+            time: '13:35',
+            title: alreadyOwned
+              ? `Calibrated ${item.name}`
+              : `Deployed ${item.name} to Field Inventory`,
+            detail: item.inventoryEffectDesc,
+            severity: 'info',
+          },
+          ...prev.activityLog,
+        ],
+      };
+    });
+  };
+
+  const handleUpdateAstronautCustomization = (
+    id: AstronautId,
+    custom: AstronautCustomization
+  ) => {
+    setSimState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        crewCustomizations: {
+          ...prev.crewCustomizations,
+          [id]: custom,
+        },
+      };
+    });
+  };
+
+  const handleTogglePreselectedEquipment = (id: EquipmentId) => {
+    setMissionConfig((prev) => {
+      const current = prev.preselectedEquipment || ['solar_array', 'solar_water_cycle'];
+      if (current.includes(id)) return prev;
+      return {
+        ...prev,
+        preselectedEquipment: [...current, id],
+      };
+    });
+  };
+
+  const handleUpdatePreMissionCustomization = (
+    id: AstronautId,
+    custom: AstronautCustomization
+  ) => {
+    setMissionConfig((prev) => ({
+      ...prev,
+      crewCustomizations: {
+        ...createDefaultCrewCustomizations(prev.crewCustomizations),
+        [id]: custom,
+      },
+    }));
+  };
+
+  const renderScreen = () => {
+    if (screen === 'story') {
+      return (
+        <CinematicStoryScene
+          initialPlanetId={missionConfig.planetId}
+          isAudioMuted={isAudioMuted}
+          onToggleAudio={() => setIsAudioMuted((m) => !m)}
+          onContinueToSetup={(chosenPlanet) => {
+            setMissionConfig((prev) => ({ ...prev, planetId: chosenPlanet }));
+            setDraftBuildings([]);
+            setScreen('builder');
+          }}
+          onOpenEquipment={() => setPreMissionModal('equipment')}
+          onOpenAstronauts={() => setPreMissionModal('astronauts')}
+        />
+      );
+    }
+
+    if (screen === 'setup') {
+      return (
+        <PlayerSetup
+          initialConfig={missionConfig}
+          onBack={() => setScreen('landing')}
+          onGoHome={handleGoHome}
+          onContinue={(playerData) => {
+            setMissionConfig((prev) => ({ ...prev, ...playerData }));
+            setScreen('planet');
+          }}
+        />
+      );
+    }
+
+    if (screen === 'planet') {
+      return (
+        <PlanetSelection
+          config={missionConfig}
+          onUpdateConfig={(partial) =>
+            setMissionConfig((prev) => ({ ...prev, ...partial }))
+          }
+          onBack={handleGoHome}
+          onGoHome={handleGoHome}
+          onSelectPlanet={(planetId) => {
+            setMissionConfig((prev) => ({ ...prev, planetId }));
+            setDraftBuildings([]);
+            setScreen('builder');
+          }}
+        />
+      );
+    }
+
+    if (screen === 'builder') {
+      return (
+        <BaseBuilder
+          config={missionConfig}
+          initialBuildings={draftBuildings}
+          onBack={() => setScreen('planet')}
+          onGoHome={handleGoHome}
+          onContinueToBriefing={(placedBuildings, remainingBudget) => {
+            setDraftBuildings(placedBuildings);
+            setDraftRemainingBudget(remainingBudget);
+            setScreen('briefing');
+          }}
+        />
+      );
+    }
+
+    if (screen === 'briefing') {
+      return (
+        <Briefing
+          config={missionConfig}
+          plannedBuildings={draftBuildings}
+          remainingBudget={draftRemainingBudget}
+          onBack={() => setScreen('builder')}
+          onGoHome={handleGoHome}
+          onLaunchMission={() => handleLaunchMission(draftBuildings, draftRemainingBudget)}
+        />
+      );
+    }
+
+    if (screen === 'launch' && simState) {
+      return (
+        <MissionLaunchScene
+          planetId={simState.planetId}
+          playerName={simState.playerName}
+          startStage={launchStartStage}
+          isAudioMuted={isAudioMuted}
+          onToggleAudio={() => setIsAudioMuted((m) => !m)}
+          onComplete={handleLaunchComplete}
+        />
+      );
+    }
+
+    if (screen === 'storm' && simState) {
+      return (
+        <StormArrivalScene
+          state={simState}
+          isAudioMuted={isAudioMuted}
+          onToggleAudio={() => setIsAudioMuted((m) => !m)}
+          onComplete={() => setScreen('mission')}
+          onResolveEmergency={() => setScreen('emergency')}
+        />
+      );
+    }
+
+    if (screen === 'mission' && simState) {
+      return (
+        <MissionControl
+          state={simState}
+          isAudioMuted={isAudioMuted}
+          onToggleAudio={() => setIsAudioMuted((m) => !m)}
+          onAdvanceDay={handleAdvanceDay}
+          onToggleBuilding={handleToggleBuilding}
+          onUpgradeBuilding={handleUpgradeBuilding}
+          onConstructBuilding={handleConstructBuilding}
+          onResearchTech={handleResearchTech}
+          onSelectAstronaut={handleSelectAstronaut}
+          onInspectStormFlue={handleInspectStormFlue}
+          onCollectDataNode={handleCollectDataNode}
+          onServiceBuilding={handleServiceBuilding}
+          onPerformSuitDiagnostic={handlePerformSuitDiagnostic}
+          onTravelToWorld={handleTravelToWorld}
+          onSynthesizeFuel={handleSynthesizeFuel}
+          onRefuelStarship={handleRefuelStarship}
+          onDiagnoseCrew={handleDiagnoseCrew}
+          onTreatCrew={handleTreatCrew}
+          onCommsStep={handleCommsStep}
+          onCraftPart={handleCraftPart}
+          onRecycleScrap={handleRecycleScrap}
+          onOrderResupply={handleOrderResupply}
+          onInspectBuildingDamage={handleInspectBuildingDamage}
+          onRepairBuilding={handleRepairBuilding}
+          onCleanDust={handleCleanDust}
+          onRepairRover={handleRepairRover}
+          onRechargeRover={handleRechargeRover}
+          onToggleRoverDrive={handleToggleRoverDrive}
+          onToggleShelterRefuge={handleToggleShelterRefuge}
+          onTriggerStormScene={() => setScreen('storm')}
+          onAddEquipmentToInventory={handleAddEquipmentToInventory}
+          onUpdateAstronautCustomization={handleUpdateAstronautCustomization}
+          onOpenEmergency={() => setScreen('emergency')}
+          onExitMission={handleGoHome}
+        />
+      );
+    }
+
+    if (screen === 'emergency' && simState) {
+      return (
+        <EmergencyCenter
+          state={simState}
+          onSelectDecision={handleSelectDecision}
+          onBackToDashboard={() => setScreen('mission')}
+        />
+      );
+    }
+
+    if (screen === 'report' && simState) {
+      return (
+        <MissionReport
+          state={simState}
+          onPlayAgain={handlePlayAgain}
+          onCompareOtherPlanet={handleCompareOtherPlanet}
+        />
+      );
+    }
+
     return (
-      <Landing
-        onStartMission={() => setScreen('setup')}
+      <UniverseExperience
+        initialMode={universeMode}
+        isAudioMuted={isAudioMuted}
         hasSavedMission={savedAvailable}
+        onToggleAudio={() => setIsAudioMuted((m) => !m)}
+        onLaunchMissionSetup={(planetId) => {
+          setUniverseMode('interactive');
+          setDraftBuildings([]);
+          if (planetId) {
+            setMissionConfig((prev) => ({ ...prev, planetId }));
+            setScreen('builder');
+          } else {
+            setScreen('planet');
+          }
+        }}
         onResumeMission={handleResumeMission}
+        onOpenEquipment={() => setPreMissionModal('equipment')}
+        onOpenAstronauts={() => setPreMissionModal('astronauts')}
       />
     );
-  }
-
-  if (screen === 'setup') {
-    return (
-      <PlayerSetup
-        initialConfig={missionConfig}
-        onBack={() => setScreen('landing')}
-        onGoHome={handleGoHome}
-        onContinue={(playerData) => {
-          setMissionConfig((prev) => ({ ...prev, ...playerData }));
-          setScreen('planet');
-        }}
-      />
-    );
-  }
-
-  if (screen === 'planet') {
-    return (
-      <PlanetSelection
-        onBack={() => setScreen('setup')}
-        onGoHome={handleGoHome}
-        onSelectPlanet={(planetId) => {
-          setMissionConfig((prev) => ({ ...prev, planetId }));
-          setScreen('briefing');
-        }}
-      />
-    );
-  }
-
-  if (screen === 'briefing') {
-    return (
-      <Briefing
-        config={missionConfig}
-        onBack={() => setScreen('planet')}
-        onGoHome={handleGoHome}
-        onLaunchBuilder={() => setScreen('builder')}
-      />
-    );
-  }
-
-  if (screen === 'builder') {
-    return (
-      <BaseBuilder
-        config={missionConfig}
-        onBack={() => setScreen('briefing')}
-        onGoHome={handleGoHome}
-        onLaunchMission={handleLaunchMission}
-      />
-    );
-  }
-
-  if (screen === 'launch' && simState) {
-    return (
-      <MissionLaunchScene
-        planetId={simState.planetId}
-        playerName={simState.playerName}
-        startStage={launchStartStage}
-        isAudioMuted={isAudioMuted}
-        onToggleAudio={() => setIsAudioMuted((m) => !m)}
-        onComplete={handleLaunchComplete}
-      />
-    );
-  }
-
-  if (screen === 'storm' && simState) {
-    return (
-      <StormArrivalScene
-        state={simState}
-        isAudioMuted={isAudioMuted}
-        onToggleAudio={() => setIsAudioMuted((m) => !m)}
-        onComplete={() => setScreen('mission')}
-        onResolveEmergency={() => setScreen('emergency')}
-      />
-    );
-  }
-
-  if (screen === 'mission' && simState) {
-    return (
-      <MissionControl
-        state={simState}
-        isAudioMuted={isAudioMuted}
-        onToggleAudio={() => setIsAudioMuted((m) => !m)}
-        onAdvanceDay={handleAdvanceDay}
-        onToggleBuilding={handleToggleBuilding}
-        onUpgradeBuilding={handleUpgradeBuilding}
-        onConstructBuilding={handleConstructBuilding}
-        onResearchTech={handleResearchTech}
-        onSelectAstronaut={handleSelectAstronaut}
-        onInspectStormFlue={handleInspectStormFlue}
-        onCollectDataNode={handleCollectDataNode}
-        onServiceBuilding={handleServiceBuilding}
-        onPerformSuitDiagnostic={handlePerformSuitDiagnostic}
-        onTravelToWorld={handleTravelToWorld}
-        onSynthesizeFuel={handleSynthesizeFuel}
-        onRefuelStarship={handleRefuelStarship}
-        onDiagnoseCrew={handleDiagnoseCrew}
-        onTreatCrew={handleTreatCrew}
-        onCommsStep={handleCommsStep}
-        onCraftPart={handleCraftPart}
-        onRecycleScrap={handleRecycleScrap}
-        onOrderResupply={handleOrderResupply}
-        onInspectBuildingDamage={handleInspectBuildingDamage}
-        onRepairBuilding={handleRepairBuilding}
-        onCleanDust={handleCleanDust}
-        onRepairRover={handleRepairRover}
-        onRechargeRover={handleRechargeRover}
-        onToggleRoverDrive={handleToggleRoverDrive}
-        onToggleShelterRefuge={handleToggleShelterRefuge}
-        onTriggerStormScene={() => setScreen('storm')}
-        onOpenEmergency={() => setScreen('emergency')}
-        onExitMission={() => setScreen('landing')}
-      />
-    );
-  }
-
-  if (screen === 'emergency' && simState) {
-    return (
-      <EmergencyCenter
-        state={simState}
-        onSelectDecision={handleSelectDecision}
-        onBackToDashboard={() => setScreen('mission')}
-      />
-    );
-  }
-
-  if (screen === 'report' && simState) {
-    return (
-      <MissionReport
-        state={simState}
-        onPlayAgain={handlePlayAgain}
-        onCompareOtherPlanet={handleCompareOtherPlanet}
-      />
-    );
-  }
+  };
 
   return (
-    <Landing
-      onStartMission={() => setScreen('setup')}
-      hasSavedMission={savedAvailable}
-      onResumeMission={handleResumeMission}
-    />
+    <>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={screen}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+          className="min-h-screen"
+        >
+          {renderScreen()}
+        </motion.div>
+      </AnimatePresence>
+
+      {preMissionModal === 'equipment' && (
+        <EquipmentShowcaseModal
+          inventory={missionConfig.preselectedEquipment || ['solar_array', 'solar_water_cycle']}
+          onAddEquipment={handleTogglePreselectedEquipment}
+          onClose={() => setPreMissionModal(null)}
+          isMuted={isAudioMuted}
+          actionButtonLabel="Stage Equipment for Launch"
+        />
+      )}
+
+      {preMissionModal === 'astronauts' && (
+        <AstronautGalleryModal
+          activeAstronautId={missionConfig.selectedCommanderId || 'abubakr'}
+          customizations={createDefaultCrewCustomizations(missionConfig.crewCustomizations)}
+          onUpdateCustomization={handleUpdatePreMissionCustomization}
+          onSelectAstronaut={(id) =>
+            setMissionConfig((prev) => ({ ...prev, selectedCommanderId: id }))
+          }
+          onClose={() => setPreMissionModal(null)}
+          isMuted={isAudioMuted}
+        />
+      )}
+    </>
   );
 }

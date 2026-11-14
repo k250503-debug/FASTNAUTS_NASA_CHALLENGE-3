@@ -1,5 +1,6 @@
 export type ScreenId =
   | 'landing'
+  | 'story'
   | 'setup'
   | 'planet'
   | 'briefing'
@@ -16,6 +17,27 @@ export type PlanetId = 'moon' | 'mars' | 'titan' | 'europa';
 export type AstronautId = 'abubakr' | 'affan' | 'ali' | 'jawwad' | 'om' | 'ammar';
 
 export type SuitPartId = 'helmet' | 'chest_pack' | 'plss_backpack' | 'arms_tools' | 'boots';
+
+export type SuitDesignId = 'artemis_eva' | 'tactical_recon' | 'cryo_heavy';
+export type HelmetStyleId = 'gold_reflective' | 'tinted_obsidian' | 'clear_hud';
+export type BackpackStyleId = 'plss_standard' | 'dual_thruster' | 'science_pack';
+
+export interface AstronautCustomization {
+  suitDesign: SuitDesignId;
+  helmetStyle: HelmetStyleId;
+  primaryColorHex: number;
+  accentColorHex: number;
+  backpackStyle: BackpackStyleId;
+}
+
+export type EquipmentId =
+  | 'solar_array'
+  | 'solar_water_cycle'
+  | 'water_collector'
+  | 'oxygen_generator'
+  | 'exploration_rover'
+  | 'comms_array'
+  | 'science_spectrometer';
 
 export type SparePartId =
   | 'cables'
@@ -204,6 +226,9 @@ export interface MissionConfig {
   difficulty: DifficultyId;
   missionDays: number;
   planetId: PlanetId;
+  selectedCommanderId?: AstronautId;
+  crewCustomizations?: Partial<Record<AstronautId, AstronautCustomization>>;
+  preselectedEquipment?: EquipmentId[];
 }
 
 export interface DecisionOutcome {
@@ -400,6 +425,8 @@ export interface MissionState {
   lunarState: LunarWorldState;
   roboticState: RoboticExplorationState;
   achievements: string[];
+  crewCustomizations: Record<AstronautId, AstronautCustomization>;
+  equipmentInventory: EquipmentId[];
   techUpgrades: {
     waterEfficiencyBonus: number;
     solarEfficiencyBonus: number;

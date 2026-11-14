@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import type { AstronautProfile, BuildingTypeId, SuitPartId } from '../types';
+import type {
+  AstronautCustomization,
+  AstronautProfile,
+  BuildingTypeId,
+  SuitPartId,
+} from '../types';
 
 export function createContactShadowTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -111,13 +116,108 @@ function addContactShadow(
   group.add(plane);
 }
 
+export function applyAstronautCustomization(
+  root: THREE.Group,
+  custom?: AstronautCustomization
+): void {
+  const refs = root.userData.animRefs as
+    | {
+        suitMat?: THREE.MeshStandardMaterial;
+        trimMat?: THREE.MeshStandardMaterial;
+        jointMat?: THREE.MeshStandardMaterial;
+        visorMat?: THREE.MeshPhysicalMaterial;
+        beaconMat?: THREE.MeshStandardMaterial;
+        chestDisplayMat?: THREE.MeshStandardMaterial;
+        selectionRing?: THREE.Mesh;
+        hudReticleMesh?: THREE.Mesh;
+        helmetRimMat?: THREE.MeshStandardMaterial;
+        designGroups?: {
+          artemis_eva: THREE.Group;
+          tactical_recon: THREE.Group;
+          cryo_heavy: THREE.Group;
+        };
+        backpackGroups?: {
+          plss_standard: THREE.Group;
+          dual_thruster: THREE.Group;
+          science_pack: THREE.Group;
+        };
+      }
+    | undefined;
+  if (!refs || !custom) return;
+
+  if (refs.suitMat) {
+    refs.suitMat.color.setHex(custom.primaryColorHex);
+    refs.suitMat.roughness = custom.suitDesign === 'tactical_recon' ? 0.58 : 0.76;
+  }
+  if (refs.trimMat) {
+    refs.trimMat.color.setHex(custom.accentColorHex);
+  }
+  if (refs.beaconMat) {
+    refs.beaconMat.color.setHex(custom.accentColorHex);
+    refs.beaconMat.emissive.setHex(custom.accentColorHex);
+  }
+  if (refs.chestDisplayMat) {
+    refs.chestDisplayMat.emissive.setHex(custom.accentColorHex);
+  }
+  if (refs.selectionRing) {
+    (refs.selectionRing.material as THREE.MeshBasicMaterial).color.setHex(custom.accentColorHex);
+  }
+
+  if (refs.visorMat) {
+    if (custom.helmetStyle === 'gold_reflective') {
+      refs.visorMat.color.setHex(0xeab308);
+      refs.visorMat.emissive.setHex(0x92400e);
+      refs.visorMat.emissiveIntensity = 0.04;
+      refs.visorMat.metalness = 0.92;
+      refs.visorMat.roughness = 0.1;
+      refs.visorMat.opacity = 1;
+      refs.visorMat.transparent = false;
+      if (refs.hudReticleMesh) refs.hudReticleMesh.visible = false;
+      if (refs.helmetRimMat) refs.helmetRimMat.emissive.setHex(0x000000);
+    } else if (custom.helmetStyle === 'tinted_obsidian') {
+      refs.visorMat.color.setHex(0x0f172a);
+      refs.visorMat.emissive.setHex(0x0284c7);
+      refs.visorMat.emissiveIntensity = 0.06;
+      refs.visorMat.metalness = 0.88;
+      refs.visorMat.roughness = 0.08;
+      refs.visorMat.opacity = 1;
+      refs.visorMat.transparent = false;
+      if (refs.hudReticleMesh) refs.hudReticleMesh.visible = true;
+      if (refs.helmetRimMat) refs.helmetRimMat.emissive.setHex(0x0284c7);
+    } else {
+      refs.visorMat.color.setHex(0x93c5fd);
+      refs.visorMat.emissive.setHex(0x0ea5e9);
+      refs.visorMat.emissiveIntensity = 0.08;
+      refs.visorMat.metalness = 0.2;
+      refs.visorMat.roughness = 0.08;
+      refs.visorMat.opacity = 0.68;
+      refs.visorMat.transparent = true;
+      if (refs.hudReticleMesh) refs.hudReticleMesh.visible = true;
+      if (refs.helmetRimMat) refs.helmetRimMat.emissive.setHex(0x0ea5e9);
+    }
+  }
+
+  if (refs.designGroups) {
+    refs.designGroups.artemis_eva.visible = custom.suitDesign === 'artemis_eva';
+    refs.designGroups.tactical_recon.visible = custom.suitDesign === 'tactical_recon';
+    refs.designGroups.cryo_heavy.visible = custom.suitDesign === 'cryo_heavy';
+  }
+
+  if (refs.backpackGroups) {
+    refs.backpackGroups.plss_standard.visible = custom.backpackStyle === 'plss_standard';
+    refs.backpackGroups.dual_thruster.visible = custom.backpackStyle === 'dual_thruster';
+    refs.backpackGroups.science_pack.visible = custom.backpackStyle === 'science_pack';
+  }
+}
+
 /**
  * High-Detail Sculpted PBR Astronaut Group (pivot at bottom-center y=0)
  */
 export function createAstronautMesh(
   profile: AstronautProfile,
   shadowTex: THREE.CanvasTexture,
-  includeHitCylinder = true
+  includeHitCylinder = true,
+  customization?: AstronautCustomization
 ): THREE.Group {
   const root = new THREE.Group();
   root.userData.astronautId = profile.id;
@@ -127,49 +227,56 @@ export function createAstronautMesh(
   const suitBump = getSuitBumpTexture();
 
   const suitMat = new THREE.MeshStandardMaterial({
-    color: 0xf1f5f9,
-    roughness: 0.62,
-    metalness: 0.08,
+    color: customization?.primaryColorHex ?? 0xd9e0e8,
+    roughness: 0.78,
+    metalness: 0.04,
     bumpMap: suitBump,
     bumpScale: 0.015,
   });
   const jointMat = new THREE.MeshStandardMaterial({
-    color: 0x475569,
-    roughness: 0.78,
-    metalness: 0.22,
+    color: 0x334155,
+    roughness: 0.72,
+    metalness: 0.25,
   });
   const trimMat = new THREE.MeshStandardMaterial({
-    color: profile.accentHex,
-    roughness: 0.32,
-    metalness: 0.42,
+    color: customization?.accentColorHex ?? profile.accentHex,
+    roughness: 0.42,
+    metalness: 0.35,
   });
   const bootMat = new THREE.MeshStandardMaterial({
     color: 0x1e293b,
     roughness: 0.86,
-    metalness: 0.18,
+    metalness: 0.16,
   });
   const visorMat = new THREE.MeshPhysicalMaterial({
-    color: 0xfbbf24,
-    emissive: 0xb45309,
-    emissiveIntensity: 0.14,
-    roughness: 0.08,
-    metalness: 0.94,
+    color: 0xeab308,
+    emissive: 0x92400e,
+    emissiveIntensity: 0.04,
+    roughness: 0.1,
+    metalness: 0.92,
     clearcoat: 1.0,
     clearcoatRoughness: 0.08,
-    iridescence: 0.45,
+    iridescence: 0.35,
     iridescenceIOR: 1.35,
   });
   const packMat = new THREE.MeshStandardMaterial({
-    color: 0xdbeafe,
-    roughness: 0.38,
-    metalness: 0.45,
+    color: 0xcbd5e1,
+    roughness: 0.56,
+    metalness: 0.28,
+  });
+  const helmetRimMat = new THREE.MeshStandardMaterial({
+    color: 0x475569,
+    emissive: 0x000000,
+    emissiveIntensity: 0.18,
+    roughness: 0.44,
+    metalness: 0.55,
   });
   const chestDisplayMat = new THREE.MeshStandardMaterial({
-    color: 0x64748b,
-    emissive: profile.accentHex,
-    emissiveIntensity: 0.35,
-    roughness: 0.25,
-    metalness: 0.65,
+    color: 0x475569,
+    emissive: customization?.accentColorHex ?? profile.accentHex,
+    emissiveIntensity: 0.14,
+    roughness: 0.32,
+    metalness: 0.55,
   });
 
   const tagPart = (obj: THREE.Object3D, part: SuitPartId) => {
@@ -180,7 +287,7 @@ export function createAstronautMesh(
   const ringGeo = new THREE.RingGeometry(0.56, 0.74, 48);
   ringGeo.rotateX(-Math.PI / 2);
   const ringMat = new THREE.MeshBasicMaterial({
-    color: profile.accentHex,
+    color: customization?.accentColorHex ?? profile.accentHex,
     side: THREE.DoubleSide,
     transparent: true,
     opacity: 0.92,
@@ -263,6 +370,45 @@ export function createAstronautMesh(
   tagPart(chestScreen, 'chest_pack');
   root.add(chestScreen);
 
+  // Modular Suit Design Overlays (artemis_eva / tactical_recon / cryo_heavy)
+  const artemisDesignGroup = new THREE.Group();
+  for (const sx of [-0.19, 0.19]) {
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.26, 0.16), packMat);
+    rib.position.set(sx, 1.04, 0.04);
+    tagPart(rib, 'chest_pack');
+    artemisDesignGroup.add(rib);
+  }
+  root.add(artemisDesignGroup);
+
+  const reconDesignGroup = new THREE.Group();
+  const harnessPlate = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.3, 0.28), jointMat);
+  harnessPlate.position.set(0, 1.09, 0.02);
+  harnessPlate.castShadow = true;
+  tagPart(harnessPlate, 'chest_pack');
+  reconDesignGroup.add(harnessPlate);
+  for (const px of [-0.24, 0.24]) {
+    const hipPouch = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.16, 0.14), trimMat);
+    hipPouch.position.set(px, 0.84, 0.02);
+    tagPart(hipPouch, 'chest_pack');
+    reconDesignGroup.add(hipPouch);
+  }
+  reconDesignGroup.visible = false;
+  root.add(reconDesignGroup);
+
+  const cryoDesignGroup = new THREE.Group();
+  const thermalShroud = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.14, 20), trimMat);
+  thermalShroud.position.set(0, 1.32, -0.02);
+  tagPart(thermalShroud, 'chest_pack');
+  cryoDesignGroup.add(thermalShroud);
+  const cryoChestArmor = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.2, 10, 20), packMat);
+  cryoChestArmor.scale.set(1.16, 0.9, 0.82);
+  cryoChestArmor.position.set(0, 1.06, 0.0);
+  tagPart(cryoChestArmor, 'chest_pack');
+  cryoDesignGroup.add(cryoChestArmor);
+  cryoDesignGroup.visible = false;
+  root.add(cryoDesignGroup);
+
+  // Modular Backpack Styles (plss_standard / dual_thruster / science_pack)
   const packShell = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.26, 10, 20), packMat);
   packShell.scale.set(1.18, 1.0, 0.62);
   packShell.position.set(0, 1.09, -0.25);
@@ -270,28 +416,78 @@ export function createAstronautMesh(
   tagPart(packShell, 'plss_backpack');
   root.add(packShell);
 
+  const plssStandardGroup = new THREE.Group();
   for (const ox of [-0.11, 0.11]) {
     const tank = new THREE.Mesh(new THREE.CapsuleGeometry(0.058, 0.24, 8, 14), trimMat);
     tank.position.set(ox, 1.07, -0.34);
     tank.castShadow = true;
     tagPart(tank, 'plss_backpack');
-    root.add(tank);
+    plssStandardGroup.add(tank);
   }
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.02, 0.42, 10), bootMat);
+  antenna.position.set(-0.15, 1.54, -0.27);
+  tagPart(antenna, 'plss_backpack');
+  plssStandardGroup.add(antenna);
+  root.add(plssStandardGroup);
+
+  const dualThrusterGroup = new THREE.Group();
+  const thrusterFlameMat = new THREE.MeshStandardMaterial({
+    color: 0x38bdf8,
+    emissive: 0x0ea5e9,
+    emissiveIntensity: 0.5,
+  });
+  for (const tx of [-0.23, 0.23]) {
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.38, 14), jointMat);
+    pod.position.set(tx, 1.12, -0.28);
+    pod.castShadow = true;
+    tagPart(pod, 'plss_backpack');
+    dualThrusterGroup.add(pod);
+
+    const nozzle = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.1, 12), trimMat);
+    nozzle.position.set(tx, 0.89, -0.28);
+    tagPart(nozzle, 'plss_backpack');
+    dualThrusterGroup.add(nozzle);
+
+    const glowRing = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.01, 8, 16), thrusterFlameMat);
+    glowRing.rotation.x = Math.PI / 2;
+    glowRing.position.set(tx, 0.84, -0.28);
+    dualThrusterGroup.add(glowRing);
+  }
+  dualThrusterGroup.visible = false;
+  root.add(dualThrusterGroup);
+
+  const sciencePackGroup = new THREE.Group();
+  const miniDish = new THREE.Mesh(
+    new THREE.SphereGeometry(0.14, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.42),
+    packMat
+  );
+  miniDish.rotation.x = -Math.PI * 0.65;
+  miniDish.position.set(-0.14, 1.56, -0.28);
+  tagPart(miniDish, 'plss_backpack');
+  sciencePackGroup.add(miniDish);
+
+  const sampleRack = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.14, 0.12), jointMat);
+  sampleRack.position.set(0, 0.86, -0.35);
+  tagPart(sampleRack, 'plss_backpack');
+  sciencePackGroup.add(sampleRack);
+  for (const cx of [-0.08, 0, 0.08]) {
+    const vial = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.11, 10), thrusterFlameMat);
+    vial.position.set(cx, 0.86, -0.4);
+    tagPart(vial, 'plss_backpack');
+    sciencePackGroup.add(vial);
+  }
+  sciencePackGroup.visible = false;
+  root.add(sciencePackGroup);
 
   const beaconMat = new THREE.MeshStandardMaterial({
-    color: profile.accentHex,
-    emissive: profile.accentHex,
-    emissiveIntensity: 1.05,
+    color: customization?.accentColorHex ?? profile.accentHex,
+    emissive: customization?.accentColorHex ?? profile.accentHex,
+    emissiveIntensity: 0.32,
   });
   const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.055, 14, 14), beaconMat);
   beacon.position.set(0.15, 1.4, -0.27);
   tagPart(beacon, 'plss_backpack');
   root.add(beacon);
-
-  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.02, 0.42, 10), bootMat);
-  antenna.position.set(-0.15, 1.54, -0.27);
-  tagPart(antenna, 'plss_backpack');
-  root.add(antenna);
 
   const makeArm = (xOffset: number) => {
     const armPivot = new THREE.Group();
@@ -351,6 +547,11 @@ export function createAstronautMesh(
   tagPart(helmet, 'helmet');
   headPivot.add(helmet);
 
+  const helmetRim = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.018, 10, 28), helmetRimMat);
+  helmetRim.position.set(0, 0.17, 0.11);
+  tagPart(helmetRim, 'helmet');
+  headPivot.add(helmetRim);
+
   const visorShield = new THREE.Mesh(
     new THREE.SphereGeometry(
       0.245,
@@ -367,10 +568,23 @@ export function createAstronautMesh(
   tagPart(visorShield, 'helmet');
   headPivot.add(visorShield);
 
+  const hudReticleMesh = new THREE.Mesh(
+    new THREE.RingGeometry(0.05, 0.062, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+    })
+  );
+  hudReticleMesh.position.set(0.07, 0.18, 0.25);
+  hudReticleMesh.visible = false;
+  headPivot.add(hudReticleMesh);
+
   const lampMat = new THREE.MeshStandardMaterial({
-    color: 0xe0f2fe,
-    emissive: 0xbae6fd,
-    emissiveIntensity: 1.2,
+    color: 0xcbd5e1,
+    emissive: 0x93c5fd,
+    emissiveIntensity: 0.35,
   });
   for (const lx of [-0.24, 0.24]) {
     const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.036, 0.09, 10), jointMat);
@@ -407,7 +621,26 @@ export function createAstronautMesh(
     beaconMat,
     visorMat,
     chestDisplayMat,
+    suitMat,
+    trimMat,
+    jointMat,
+    helmetRimMat,
+    hudReticleMesh,
+    designGroups: {
+      artemis_eva: artemisDesignGroup,
+      tactical_recon: reconDesignGroup,
+      cryo_heavy: cryoDesignGroup,
+    },
+    backpackGroups: {
+      plss_standard: plssStandardGroup,
+      dual_thruster: dualThrusterGroup,
+      science_pack: sciencePackGroup,
+    },
   };
+
+  if (customization) {
+    applyAstronautCustomization(root, customization);
+  }
 
   return root;
 }
@@ -434,7 +667,7 @@ export function createBuildingMesh(
   const damaged = Boolean(options?.damaged);
   const dustRatio = Math.min(1, (options?.dustPct || 0) / 100);
 
-  const hullColor = new THREE.Color(0xe2e8f0);
+  const hullColor = new THREE.Color(0xcfd8e3);
   if (dustRatio > 0.05) {
     hullColor.lerp(new THREE.Color(0x94a3b8), dustRatio * 0.55);
   }
@@ -444,23 +677,23 @@ export function createBuildingMesh(
 
   const hullMat = new THREE.MeshStandardMaterial({
     color: hullColor,
-    roughness: 0.36 + dustRatio * 0.45,
-    metalness: 0.38 * (1 - dustRatio * 0.5),
+    roughness: 0.52 + dustRatio * 0.38,
+    metalness: 0.26 * (1 - dustRatio * 0.5),
   });
   const darkMetal = new THREE.MeshStandardMaterial({
     color: 0x334155,
-    roughness: 0.48,
-    metalness: 0.72,
+    roughness: 0.52,
+    metalness: 0.65,
   });
   const trimGold = new THREE.MeshStandardMaterial({
-    color: damaged ? 0xf97316 : 0xeab308,
-    roughness: 0.24,
-    metalness: 0.85,
+    color: damaged ? 0xf97316 : 0xd97706,
+    roughness: 0.32,
+    metalness: 0.78,
   });
   const statusMat = new THREE.MeshStandardMaterial({
     color: damaged ? 0xef4444 : online ? 0x10b981 : 0xf59e0b,
     emissive: damaged ? 0xef4444 : online ? 0x10b981 : 0xf59e0b,
-    emissiveIntensity: damaged ? 1.55 : 0.95,
+    emissiveIntensity: damaged ? 0.85 : 0.42,
   });
 
   const base = new THREE.Mesh(new THREE.CylinderGeometry(1.48, 1.68, 0.22, 32), darkMetal);
@@ -514,9 +747,9 @@ export function createBuildingMesh(
     const windowMat = new THREE.MeshStandardMaterial({
       color: 0x38bdf8,
       emissive: 0x0ea5e9,
-      emissiveIntensity: online && !damaged ? 1.05 : 0.2,
-      roughness: 0.15,
-      metalness: 0.5,
+      emissiveIntensity: online && !damaged ? 0.38 : 0.1,
+      roughness: 0.18,
+      metalness: 0.45,
     });
     for (const wx of [-0.72, 0.72]) {
       const frame = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.035, 10, 20), darkMetal);

@@ -16,7 +16,7 @@ export default function Navbar({
   stepText,
 }: NavbarProps) {
   return (
-    <header className="w-full border-b border-slate-800 bg-[#07090E]/95 backdrop-blur-sm sticky top-0 z-40">
+    <header className="w-full border-b border-slate-800 bg-[#07090E] sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-8">
         {/* Zone 1: Single-line Brand Wordmark */}
         <button

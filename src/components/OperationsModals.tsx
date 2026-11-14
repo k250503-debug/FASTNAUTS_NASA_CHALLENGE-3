@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   Award,
   CheckCircle2,
-  Cpu,
   Fan,
   Fuel,
   HeartPulse,
@@ -11,16 +10,12 @@ import {
   PlusCircle,
   Radio,
   Recycle,
-  RefreshCw,
-  Rocket,
-  Shield,
   Sliders,
-  Sparkles,
   Truck,
   Wrench,
   X,
 } from 'lucide-react';
-import { ASTRONAUTS, getAstronautById } from '../data/astronauts';
+import { ASTRONAUTS } from '../data/astronauts';
 import { BUILDINGS, getBuildingDef } from '../data/buildings';
 import { getPlanetById, PLANETS } from '../data/planets';
 import {
@@ -38,7 +33,6 @@ import type {
   ConstructionMaterialId,
   MiniGameKind,
   MissionState,
-  PlanetId,
   SparePartId,
 } from '../types';
 
@@ -57,10 +51,7 @@ export type OpsModalKind =
 interface OperationsModalsProps {
   openModal: OpsModalKind;
   state: MissionState;
-  pendingTransitWorld: PlanetId | null;
   onClose: () => void;
-  onCancelTransit: () => void;
-  onConfirmTransit: (planetId: PlanetId) => void;
   // Fuel explicit actions
   onSynthesizeFuel: () => void;
   onRefuelStarship: () => void;
@@ -90,10 +81,7 @@ interface OperationsModalsProps {
 export default function OperationsModals({
   openModal,
   state,
-  pendingTransitWorld,
   onClose,
-  onCancelTransit,
-  onConfirmTransit,
   onSynthesizeFuel,
   onRefuelStarship,
   onDiagnoseCrew,
@@ -131,85 +119,6 @@ export default function OperationsModals({
   const freeCells = Array.from({ length: 16 }, (_, i) => i).filter(
     (i) => !occupiedCells.has(i)
   );
-
-  // Explicit Interplanetary Transit Confirmation Dialog
-  if (pendingTransitWorld) {
-    const dest = getPlanetById(pendingTransitWorld);
-    const isVisited = state.visitedWorlds.includes(pendingTransitWorld);
-    const fuelRequired = isVisited ? 0 : state.fuel.transitCost;
-    const hasEnoughFuel = state.fuel.shipTankPct >= fuelRequired;
-
-    return (
-      <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
-        <div className="max-w-md w-full rounded-xl bg-space-900 border border-sky-500/50 p-6 relative">
-          <button
-            type="button"
-            onClick={onCancelTransit}
-            aria-label="Close transit dialog"
-            className="absolute top-4 right-4 text-slate-400 hover:text-white"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
-          <div className="text-xs font-mono uppercase text-sky-400 mb-1 flex items-center gap-1.5">
-            <Rocket className="w-4 h-4" /> Interplanetary Flight Authorization
-          </div>
-          <h3 className="font-display text-2xl font-bold text-white mb-2">
-            Launch to {dest.name}?
-          </h3>
-          <p className="text-xs text-slate-300 leading-relaxed mb-4">
-            Destination gravity: <strong className="text-white">{dest.gravityMs2} m/s²</strong> ·{' '}
-            Atmosphere: <strong className="text-white">{dest.atmosphereKpa} kPa</strong> · Temp:{' '}
-            <strong className="text-white">{dest.tempRangeC}</strong>
-          </p>
-
-          <div className="space-y-2 text-xs font-mono mb-5">
-            <div className="flex justify-between p-2.5 rounded-lg bg-space-950 border border-slate-800">
-              <span className="text-slate-400">Starship Propellant Tank</span>
-              <span className={hasEnoughFuel ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                {state.fuel.shipTankPct}%
-              </span>
-            </div>
-            <div className="flex justify-between p-2.5 rounded-lg bg-space-950 border border-slate-800">
-              <span className="text-slate-400">Required Transit Burn</span>
-              <span className="text-sky-300 font-bold">
-                {fuelRequired === 0 ? '0% (Established Beacon)' : `${fuelRequired}%`}
-              </span>
-            </div>
-          </div>
-
-          {!hasEnoughFuel && (
-            <div className="mb-4 p-3 rounded-lg bg-rose-950/60 border border-rose-500/50 text-xs text-rose-200">
-              Insufficient Starship propellant! Open the Fuel Depot panel to synthesize & transfer
-              methane/LOX before departing for unvisited worlds.
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onCancelTransit}
-              className="px-4 py-2 rounded-lg bg-[#07090E] border border-slate-700 text-xs text-slate-300 hover:text-white"
-            >
-              Stay on {planet.name}
-            </button>
-            <button
-              type="button"
-              disabled={!hasEnoughFuel}
-              onClick={() => onConfirmTransit(pendingTransitWorld)}
-              className={`px-4 py-2 rounded-lg font-display font-bold text-xs flex items-center gap-1.5 ${
-                hasEnoughFuel
-                  ? 'bg-sky-500 hover:bg-sky-400 text-slate-950'
-                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-              }`}
-            >
-              <Rocket className="w-3.5 h-3.5" /> Confirm Launch
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (!openModal) return null;
 

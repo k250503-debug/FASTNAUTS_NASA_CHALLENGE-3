@@ -8,6 +8,7 @@ import { getPlanetById } from '../data/planets';
 import type { AstronautId, MissionState, PlanetId } from '../types';
 import { LANDED_SHIP_YAW } from './MissionLaunchScene';
 import {
+  applyAstronautCustomization,
   createAstronautMesh,
   createBuildingMesh,
   createContactShadowTexture,
@@ -22,6 +23,7 @@ import {
   setShelterDoorsOpen,
   setShipAirlockAndRamp,
 } from './models';
+import { createAAARenderPipeline } from './postfx';
 import {
   ROAMING_RADIUS,
   createTerrainAndSkyGroup,
@@ -85,19 +87,6 @@ export function getBuildingWorldPos(cellIndex: number): { x: number; z: number }
   };
 }
 
-function detectSoftwareWebGL(): boolean {
-  try {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-    if (!gl) return true;
-    const debugExt = gl.getExtension('WEBGL_debug_renderer_info');
-    if (!debugExt) return false;
-    const rendererStr = String(gl.getParameter(debugExt.UNMASKED_RENDERER_WEBGL) || '');
-    return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(rendererStr);
-  } catch {
-    return true;
-  }
-}
 
 function findUserDataInAncestors(obj: THREE.Object3D | null): {
   astronautId?: AstronautId;
@@ -187,6 +176,7 @@ export default function OutpostScene3D({
     syncBuildings: () => void;
     syncDataNodes: () => void;
     syncFlag: () => void;
+    syncCustomizations: () => void;
     focusAstronaut: (id: AstronautId) => void;
   } | null>(null);
 
@@ -243,20 +233,6 @@ export default function OutpostScene3D({
     const container = mountRef.current;
     if (!container) return;
 
-    const isSoftwareGl = detectSoftwareWebGL();
-    const renderer = new THREE.WebGLRenderer({
-      antialias: !isSoftwareGl,
-      powerPreference: 'high-performance',
-    });
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(container.clientWidth || 800, container.clientHeight || 600);
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.shadowMap.enabled = !isSoftwareGl;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    container.appendChild(renderer.domElement);
-
     const scene = new THREE.Scene();
     const initialSpec = getPlanetEnvironmentSpec(stateRef.current.planetId);
     scene.background = new THREE.Color(initialSpec.skyColor);
@@ -270,6 +246,14 @@ export default function OutpostScene3D({
     );
     camera.position.set(0, 12.5, 20.5);
 
+    const pipeline = createAAARenderPipeline(container, scene, camera, {
+      bloomStrength: 0.07,
+      bloomRadius: 0.32,
+      bloomThreshold: 1.18,
+      exposure: 0.92,
+    });
+    const { renderer, isSoftwareGl } = pipeline;
+
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
@@ -282,6 +266,7 @@ export default function OutpostScene3D({
     const roomEnv = new RoomEnvironment();
     const envRT = pmremGenerator.fromScene(roomEnv, 0.04);
     scene.environment = envRT.texture;
+    scene.environmentIntensity = 0.28;
 
     const hemiLight = new THREE.HemisphereLight(
       initialSpec.hemiSkyColor,
@@ -305,7 +290,7 @@ export default function OutpostScene3D({
     sunLight.shadow.normalBias = 0.02;
     scene.add(sunLight);
 
-    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.85);
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.28);
     rimLight.position.set(-16, 10, -18);
     scene.add(rimLight);
 
@@ -495,7 +480,12 @@ export default function OutpostScene3D({
     scene.add(astronautsGroup);
 
     const astroEntries = ASTRONAUTS.map((profile, idx) => {
-      const mesh = createAstronautMesh(profile, shadowTex);
+      const mesh = createAstronautMesh(
+        profile,
+        shadowTex,
+        true,
+        stateRef.current.crewCustomizations?.[profile.id]
+      );
       const sx = idx < 3 ? -7.4 + idx * 1.4 : 7.6;
       const sz = idx < 3 ? 8.2 : -2.2 + (idx - 3) * 2.2;
       mesh.position.set(sx, groundHeightAt(stateRef.current.planetId, sx, sz), sz);
@@ -546,11 +536,26 @@ export default function OutpostScene3D({
       }
     };
 
+    const syncCustomizations = () => {
+      astroEntries.forEach((entry) => {
+        const custom = stateRef.current.crewCustomizations?.[entry.profile.id];
+        if (custom) applyAstronautCustomization(entry.mesh, custom);
+      });
+    };
+
     syncPlanet(stateRef.current.planetId);
     syncBuildings();
     syncDataNodes();
     syncFlag();
-    syncActionsRef.current = { syncPlanet, syncBuildings, syncDataNodes, syncFlag, focusAstronaut };
+    syncCustomizations();
+    syncActionsRef.current = {
+      syncPlanet,
+      syncBuildings,
+      syncDataNodes,
+      syncFlag,
+      syncCustomizations,
+      focusAstronaut,
+    };
 
     let workAnim: {
       astronautId: AstronautId;
@@ -661,9 +666,7 @@ export default function OutpostScene3D({
     const handleResize = () => {
       const w = container.clientWidth || 800;
       const h = container.clientHeight || 600;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      pipeline.resize(w, h, camera);
     };
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(container);
@@ -1249,7 +1252,7 @@ export default function OutpostScene3D({
 
       const shipRefs = spaceshipGroup.userData.spaceshipRefs;
       if (shipRefs) {
-        shipRefs.beaconMat.emissiveIntensity = 0.75 + 0.65 * Math.sin(elapsed * 3.1);
+        shipRefs.beaconMat.emissiveIntensity = 0.45 + 0.35 * Math.sin(elapsed * 3.1);
       }
 
       // 4. Deep Sky Meteors + Solar Eclipse Dimming + Surface Weather Particles
@@ -1426,8 +1429,8 @@ export default function OutpostScene3D({
         });
       }
 
-      // 7. Render
-      renderer.render(scene, camera);
+      // 7. Render with AAA bloom & ACES tone mapping
+      pipeline.renderFrame();
 
       // 8. Project Floating Labels
       const w = container.clientWidth || 800;
@@ -1525,10 +1528,7 @@ export default function OutpostScene3D({
       roomEnv.dispose();
       pmremGenerator.dispose();
       controls.dispose();
-      renderer.dispose();
-      if (renderer.domElement.parentNode === container) {
-        container.removeChild(renderer.domElement);
-      }
+      pipeline.dispose();
     };
   }, []);
 
@@ -1537,7 +1537,14 @@ export default function OutpostScene3D({
     syncActionsRef.current?.syncBuildings();
     syncActionsRef.current?.syncDataNodes();
     syncActionsRef.current?.syncFlag();
-  }, [state.planetId, state.buildings, state.dataNodes, state.flagsByWorld]);
+    syncActionsRef.current?.syncCustomizations();
+  }, [
+    state.planetId,
+    state.buildings,
+    state.dataNodes,
+    state.flagsByWorld,
+    state.crewCustomizations,
+  ]);
 
   useEffect(() => {
     syncActionsRef.current?.focusAstronaut(state.activeAstronautId);

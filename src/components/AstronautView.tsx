@@ -17,6 +17,7 @@ import { ASTRONAUTS, getAstronautById } from '../data/astronauts';
 import { getPlanetById } from '../data/planets';
 import { LANDED_SHIP_YAW } from '../three/MissionLaunchScene';
 import {
+  applyAstronautCustomization,
   createAstronautMesh,
   createContactShadowTexture,
   createDataNodeMesh,
@@ -196,6 +197,7 @@ export default function AstronautView({
   };
 
   const syncWorldRef = useRef<((worldId: PlanetId) => void) | null>(null);
+  const syncCustomizationsRef = useRef<(() => void) | null>(null);
   const focusSelectedRef = useRef<((id: AstronautId, resetCam?: boolean) => void) | null>(null);
   const applyCameraModeRef = useRef<((mode: AstronautCameraMode) => void) | null>(null);
   const triggerJumpRef = useRef<(() => void) | null>(null);
@@ -238,7 +240,7 @@ export default function AstronautView({
     renderer.setSize(container.clientWidth || 800, container.clientHeight || 600);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 0.92;
     renderer.shadowMap.enabled = !isSoftwareGl;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
@@ -268,6 +270,7 @@ export default function AstronautView({
     const roomEnv = new RoomEnvironment();
     const envRT = pmremGenerator.fromScene(roomEnv, 0.04);
     scene.environment = envRT.texture;
+    scene.environmentIntensity = 0.28;
     pmremGenerator.dispose();
 
     const hemiLight = new THREE.HemisphereLight(
@@ -292,7 +295,7 @@ export default function AstronautView({
     keyLight.shadow.normalBias = 0.02;
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.85);
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.28);
     rimLight.position.set(-10, 8, -10);
     scene.add(rimLight);
 
@@ -373,7 +376,12 @@ export default function AstronautView({
 
     const astroEntries = ASTRONAUTS.map((profile, idx) => {
       const slot = STAGE_SLOTS[idx % STAGE_SLOTS.length];
-      const mesh = createAstronautMesh(profile, shadowTex, false);
+      const mesh = createAstronautMesh(
+        profile,
+        shadowTex,
+        false,
+        stateRef.current.crewCustomizations?.[profile.id]
+      );
       mesh.position.set(slot.x, groundHeightAt(worldIdRef.current, slot.x, slot.z), slot.z);
       mesh.rotation.y = slot.yaw;
       crewGroup.add(mesh);
@@ -389,6 +397,13 @@ export default function AstronautView({
         walkPhase: idx * 0.9,
       };
     });
+
+    syncCustomizationsRef.current = () => {
+      astroEntries.forEach((entry) => {
+        const c = stateRef.current.crewCustomizations?.[entry.profile.id];
+        if (c) applyAstronautCustomization(entry.mesh, c);
+      });
+    };
 
     let activeDiagnostic: {
       astronautId: AstronautId;
@@ -960,9 +975,9 @@ export default function AstronautView({
 
           let targetHeadY = 0;
           let targetHeadX = 0;
-          let targetVisorGlow = 0.12;
-          let targetChestGlow = 0.28;
-          let targetBeaconGlow = 0.9;
+          let targetVisorGlow = 0.04;
+          let targetChestGlow = 0.14;
+          let targetBeaconGlow = 0.32;
 
           if (isDiagTarget && activeDiagnostic) {
             const kind = activeDiagnostic.kind;
@@ -970,16 +985,16 @@ export default function AstronautView({
               targetHeadY = Math.sin(diagProgress * Math.PI * 3) * 0.65 * diagEnvelope;
               targetHeadX = Math.sin(diagProgress * Math.PI * 2) * 0.16 * diagEnvelope;
               targetVisorGlow =
-                0.12 + 0.9 * Math.abs(Math.sin(diagProgress * Math.PI * 4)) * diagEnvelope;
+                0.04 + 0.35 * Math.abs(Math.sin(diagProgress * Math.PI * 4)) * diagEnvelope;
             } else if (kind === 'chest_pack') {
               refs.rightArm.rotation.x = -1.18 * diagEnvelope;
               refs.rightArm.rotation.z = -0.34 * diagEnvelope;
               targetHeadX = 0.24 * diagEnvelope;
-              targetChestGlow = 0.28 + 1.45 * diagEnvelope;
+              targetChestGlow = 0.14 + 0.55 * diagEnvelope;
             } else if (kind === 'plss_backpack') {
               renderYaw += diagEnvelope * 2.65;
               targetBeaconGlow =
-                0.9 + 2.4 * Math.abs(Math.sin(diagProgress * Math.PI * 5)) * diagEnvelope;
+                0.32 + 0.85 * Math.abs(Math.sin(diagProgress * Math.PI * 5)) * diagEnvelope;
             } else if (kind === 'arms_tools') {
               const strokeL = Math.sin(diagProgress * Math.PI * 6) * 0.42;
               const strokeR = Math.cos(diagProgress * Math.PI * 6) * 0.42;
@@ -991,7 +1006,7 @@ export default function AstronautView({
                 (-0.24 - Math.cos(diagProgress * Math.PI * 4) * 0.1) * diagEnvelope;
               targetHeadX = 0.22 * diagEnvelope;
               targetHeadY = Math.sin(diagProgress * Math.PI * 3) * 0.15 * diagEnvelope;
-              targetChestGlow = 0.28 + 1.15 * diagEnvelope;
+              targetChestGlow = 0.14 + 0.45 * diagEnvelope;
             } else if (kind === 'boots') {
               posY += Math.sin(diagProgress * Math.PI) * 0.34;
               const stomp = Math.sin(diagProgress * Math.PI * 4) * 0.58 * diagEnvelope;
@@ -1007,7 +1022,7 @@ export default function AstronautView({
               refs.leftArm.rotation.z = 0.2 * diagEnvelope;
               refs.rightArm.rotation.z = -0.2 * diagEnvelope;
               targetHeadX = 0.18 * diagEnvelope;
-              targetChestGlow = 0.28 + 1.1 * diagEnvelope;
+              targetChestGlow = 0.14 + 0.45 * diagEnvelope;
             } else if (kind === 'data_node') {
               const targetAngle = Math.atan2(SAMPLE_POS.x - entry.x, SAMPLE_POS.z - entry.z);
               renderYaw = THREE.MathUtils.lerp(entry.yaw, targetAngle, diagEnvelope);
@@ -1018,7 +1033,7 @@ export default function AstronautView({
               refs.leftArm.rotation.z = 0.22 * diagEnvelope;
               refs.rightArm.rotation.z = -0.22 * diagEnvelope;
               targetHeadX = 0.2 * diagEnvelope;
-              targetVisorGlow = 0.12 + 0.75 * diagEnvelope;
+              targetVisorGlow = 0.04 + 0.28 * diagEnvelope;
             }
           }
 
@@ -1222,7 +1237,8 @@ export default function AstronautView({
 
   useEffect(() => {
     syncWorldRef.current?.(activeWorldId);
-  }, [activeWorldId, state.flagsByWorld]);
+    syncCustomizationsRef.current?.();
+  }, [activeWorldId, state.flagsByWorld, state.crewCustomizations]);
 
   useEffect(() => {
     focusSelectedRef.current?.(state.activeAstronautId, false);

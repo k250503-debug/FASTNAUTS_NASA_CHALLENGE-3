@@ -1,23 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import {
-  CheckCircle2,
-  Clock,
-  CloudLightning,
-  Flag,
-  Flame,
-  Globe,
-  MapPin,
-  Mic,
-  Rocket,
-  ShieldAlert,
-  SkipForward,
-  Users,
-  Volume2,
-  VolumeX,
-  Wind,
-} from 'lucide-react';
 import { ASTRONAUTS } from '../data/astronauts';
 import { getPlanetById } from '../data/planets';
 import { speakNasaText, stopNasaSpeech } from '../utils/nasaVoice';
@@ -86,10 +69,10 @@ interface MissionLaunchSceneProps {
   onComplete: (flagChoice: FlagLandingChoice) => void;
 }
 
-const BOARDING_DURATION = 5.4;
-const TRANSIT_DURATION = 30.0;
-const LANDING_DURATION = 6.5;
-const DISEMBARK_DURATION = 9.4;
+const BOARDING_DURATION = 3.2;
+const TRANSIT_DURATION = 9.0;
+const LANDING_DURATION = 5.2;
+const DISEMBARK_DURATION = 6.2;
 const TOTAL_DURATION =
   BOARDING_DURATION + TRANSIT_DURATION + LANDING_DURATION + DISEMBARK_DURATION;
 
@@ -380,19 +363,10 @@ function getStormColorHex(planetId: PlanetId): number {
   }
 }
 
-function getStageTimeOffset(stage: LaunchStageId): number {
-  if (stage === 'boarding') return 0;
-  if (stage === 'transit') return BOARDING_DURATION;
-  if (stage === 'landing') return BOARDING_DURATION + TRANSIT_DURATION;
-  return BOARDING_DURATION + TRANSIT_DURATION + LANDING_DURATION;
-}
-
 export default function MissionLaunchScene({
   planetId,
-  playerName,
   startStage = 'boarding',
   isAudioMuted,
-  onToggleAudio,
   onComplete,
 }: MissionLaunchSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -400,25 +374,14 @@ export default function MissionLaunchScene({
   const briefing = NASA_FLIGHT_BRIEFINGS[planetId];
   const stormOverlayStyle = getStormOverlayRgba(planetId);
   const [stage, setStage] = useState<LaunchStageId>(startStage);
-  const [boardedCount, setBoardedCount] = useState(0);
-  const [disembarkedCount, setDisembarkedCount] = useState(0);
-  const [flagPlanted, setFlagPlanted] = useState(false);
-  const [selectedFlagId, setSelectedFlagId] = useState<string>(FLAG_SITE_PRESETS[0].id);
-  const [progressPct, setProgressPct] = useState(0);
-  const [transitRemainingSec, setTransitRemainingSec] = useState(Math.ceil(TRANSIT_DURATION));
-  const [touchdownReady, setTouchdownReady] = useState(false);
   const [stormOverlayLevel, setStormOverlayLevel] = useState(0);
-  const [isVoiceSpeaking, setIsVoiceSpeaking] = useState(false);
-  const [selectedVoiceLabel, setSelectedVoiceLabel] = useState('Flight Officer Elena Vance');
 
-  const selectedFlagPreset =
-    FLAG_SITE_PRESETS.find((f) => f.id === selectedFlagId) || FLAG_SITE_PRESETS[0];
+  const selectedFlagPreset = FLAG_SITE_PRESETS[0];
   const selectedFlagRef = useRef(selectedFlagPreset);
   selectedFlagRef.current = selectedFlagPreset;
 
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
-  const jumpToStageRef = useRef<((target: LaunchStageId) => void) | null>(null);
   const mutedRef = useRef(isAudioMuted);
   mutedRef.current = isAudioMuted;
   const spokenStageKeyRef = useRef<string>('');
@@ -429,18 +392,12 @@ export default function MissionLaunchScene({
       urgent,
       rate: 0.96,
       pitch: 1.12,
-      onStart: (voiceName) => {
-        setSelectedVoiceLabel(voiceName);
-        setIsVoiceSpeaking(true);
-      },
-      onEnd: () => setIsVoiceSpeaking(false),
     });
   };
 
   useEffect(() => {
     if (isAudioMuted) {
       stopNasaSpeech();
-      setIsVoiceSpeaking(false);
       return;
     }
 
@@ -455,13 +412,12 @@ export default function MissionLaunchScene({
       if (spokenStageKeyRef.current !== key) {
         spokenStageKeyRef.current = key;
         speakBriefing(
-          `Touchdown confirmed on ${planet.name}. Airlock open and ramp deployed. Crew disembarking onto the surface. Commander Abubakr, plant the expedition flag and begin storm flue inspection.`,
+          `Touchdown confirmed on ${planet.name}. Airlock open and ramp deployed. Crew disembarking onto the surface.`,
           false
         );
       }
     } else {
       stopNasaSpeech();
-      setIsVoiceSpeaking(false);
     }
   }, [isAudioMuted, stage, planetId]);
 
@@ -496,7 +452,7 @@ export default function MissionLaunchScene({
     renderer.setSize(container.clientWidth || 960, container.clientHeight || 600);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.14;
+    renderer.toneMappingExposure = 0.92;
     renderer.shadowMap.enabled = !isSoftwareGl;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
@@ -519,11 +475,12 @@ export default function MissionLaunchScene({
     const roomEnv = new RoomEnvironment();
     const envRT = pmremGenerator.fromScene(roomEnv, 0.04);
     scene.environment = envRT.texture;
+    scene.environmentIntensity = 0.28;
 
-    const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.9);
+    const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.42);
     scene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight(0xfff1d6, 2.4);
+    const keyLight = new THREE.DirectionalLight(0xfff1d6, 1.48);
     keyLight.position.set(16, 24, 18);
     keyLight.castShadow = !isSoftwareGl;
     keyLight.shadow.mapSize.set(isSoftwareGl ? 1024 : 2048, isSoftwareGl ? 1024 : 2048);
@@ -535,7 +492,7 @@ export default function MissionLaunchScene({
     keyLight.shadow.normalBias = 0.02;
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0x60a5fa, 0.85);
+    const rimLight = new THREE.DirectionalLight(0x60a5fa, 0.28);
     rimLight.position.set(-16, 12, -18);
     scene.add(rimLight);
 
@@ -1044,26 +1001,7 @@ export default function MissionLaunchScene({
     let seqTime = startStage === 'transit' ? BOARDING_DURATION : 0;
     let completed = false;
     let lastReportedStage: LaunchStageId = startStage;
-    let lastReportedBoarded = -1;
-    let lastReportedDisembarked = -1;
-    let lastReportedFlag = false;
-    let lastReportedPct = -1;
-    let lastReportedTransitRem = -1;
     let lastReportedStorm = -1;
-
-    jumpToStageRef.current = (target: LaunchStageId) => {
-      seqTime = getStageTimeOffset(target);
-      completed = false;
-      setTouchdownReady(false);
-      setFlagPlanted(false);
-      if (target !== 'landing') {
-        lastReportedStorm = 0;
-        setStormOverlayLevel(0);
-      }
-      if (target === 'transit' || target === 'disembark') {
-        spokenStageKeyRef.current = '';
-      }
-    };
 
     const onContextLost = (e: Event) => {
       e.preventDefault();
@@ -1133,12 +1071,6 @@ export default function MissionLaunchScene({
         setStage(curStage);
       }
 
-      const pct = Math.min(100, Math.round((seqTime / TOTAL_DURATION) * 100));
-      if (pct !== lastReportedPct) {
-        lastReportedPct = pct;
-        setProgressPct(pct);
-      }
-
       boardingGroup.visible = curStage === 'boarding';
       transitGroup.visible = curStage === 'transit';
       surfaceGroup.visible = curStage === 'landing' || curStage === 'disembark';
@@ -1156,18 +1088,18 @@ export default function MissionLaunchScene({
         fog.color.copy(_skyColor);
         fog.density = 0.012;
         keyLight.color.setHex(0xfff1d6);
-        keyLight.intensity = 2.35;
+        keyLight.intensity = 1.45;
         hemiLight.color.setHex(0x93c5fd);
         hemiLight.groundColor.setHex(0x1e293b);
-        hemiLight.intensity = 0.9;
+        hemiLight.intensity = 0.44;
 
-        // Open airlock & ramp during boarding (t=0..3.6), close & stow cleanly (3.6..4.4), then ignition liftoff (4.4..5.4)!
-        const doorOpen = t < 3.6 ? Math.min(1, t / 0.5) : Math.max(0, 1 - (t - 3.6) / 0.6);
-        const rampOpen = t < 3.8 ? 1 : Math.max(0, 1 - (t - 3.8) / 0.55);
+        // Open airlock & ramp during boarding (t=0..2.1), close & stow cleanly (2.1..2.55), then ignition liftoff (2.55..3.2)
+        const doorOpen = t < 2.1 ? Math.min(1, t / 0.35) : Math.max(0, 1 - (t - 2.1) / 0.42);
+        const rampOpen = t < 2.2 ? 1 : Math.max(0, 1 - (t - 2.2) / 0.38);
         setShipAirlockAndRamp(shipBoarding, doorOpen, rampOpen);
 
-        const liftoffP = THREE.MathUtils.clamp((t - 4.35) / (BOARDING_DURATION - 4.35), 0, 1);
-        const shipAlt = Math.pow(liftoffP, 2.1) * 7.5;
+        const liftoffP = THREE.MathUtils.clamp((t - 2.52) / (BOARDING_DURATION - 2.52), 0, 1);
+        const shipAlt = Math.pow(liftoffP, 2.0) * 7.8;
         shipBoarding.position.set(0, shipAlt, 0);
         shipBoarding.rotation.set(0, 0, 0);
         liftoffFlame.group.visible = liftoffP > 0.02;
@@ -1175,28 +1107,25 @@ export default function MissionLaunchScene({
           const fl = 0.9 + Math.sin(t * 40) * 0.14;
           liftoffFlame.coreCone.scale.set(1, fl * 1.2, 1);
           liftoffFlame.outerCone.scale.set(1.1, fl * 1.4, 1.1);
-          liftoffFlame.light.intensity = 6.5 * fl;
+          liftoffFlame.light.intensity = 5.2 * fl;
           targetThrustAudio = 0.055;
         }
 
-        let boarded = 0;
         boardingCrew.forEach((member, idx) => {
-          const walkDelay = idx * 0.32;
-          const walkSpan = 2.1;
+          const walkDelay = idx * 0.18;
+          const walkSpan = 1.28;
           const localP = THREE.MathUtils.clamp((t - walkDelay) / walkSpan, 0, 1);
 
-          // Walk smoothly from startZ -> bottom of ramp (4.1) -> top of ramp inside airlock alcove (1.26)
           const zPos = THREE.MathUtils.lerp(member.startZ, 1.24, localP);
           const rampBlend = THREE.MathUtils.smoothstep(4.2 - zPos, 0, 2.9);
           const yPos = 0.16 + rampBlend * 1.82;
           const xPos = THREE.MathUtils.lerp(member.laneX, 0, rampBlend);
 
-          // Stay strictly full 1.0 scale until stepping cleanly inside doorway
           member.mesh.scale.setScalar(1);
           member.mesh.visible = localP < 0.985;
           member.mesh.position.set(xPos, yPos, zPos);
 
-          const walkCycle = t * 9.5 + idx * 1.1;
+          const walkCycle = t * 10.5 + idx * 1.1;
           const swing = Math.sin(walkCycle) * 0.55;
           const refs = member.mesh.userData.animRefs;
           if (refs) {
@@ -1206,18 +1135,11 @@ export default function MissionLaunchScene({
             refs.rightArm.rotation.x = swing * 0.75;
             refs.selectionRing.visible = false;
           }
-
-          if (localP >= 0.96) boarded += 1;
         });
-
-        if (boarded !== lastReportedBoarded) {
-          lastReportedBoarded = boarded;
-          setBoardedCount(boarded);
-        }
 
         const shipRefs = shipBoarding.userData.spaceshipRefs;
         if (shipRefs) {
-          shipRefs.beaconMat.emissiveIntensity = 0.9 + 0.7 * Math.sin(t * 4);
+          shipRefs.beaconMat.emissiveIntensity = 0.4 + 0.35 * Math.sin(t * 4);
         }
         if (lastReportedStorm !== 0) {
           lastReportedStorm = 0;
@@ -1235,21 +1157,16 @@ export default function MissionLaunchScene({
       } else if (curStage === 'transit') {
         const localT = seqTime - BOARDING_DURATION;
         const p = THREE.MathUtils.clamp(localT / TRANSIT_DURATION, 0, 1);
-        const remSec = Math.max(0, Math.ceil(TRANSIT_DURATION - localT));
-        if (remSec !== lastReportedTransitRem) {
-          lastReportedTransitRem = remSec;
-          setTransitRemainingSec(remSec);
-        }
 
         _skyColor.setHex(0x02040a);
         scene.background = _skyColor;
         fog.color.copy(_skyColor);
         fog.density = 0.002;
-        keyLight.color.setHex(0xffffff);
-        keyLight.intensity = 2.45;
+        keyLight.color.setHex(0xfff8eb);
+        keyLight.intensity = 1.55;
         hemiLight.color.setHex(0x60a5fa);
         hemiLight.groundColor.setHex(0x0f172a);
-        hemiLight.intensity = 0.72;
+        hemiLight.intensity = 0.42;
 
         earthSphere.rotation.y += dt * 0.16;
         destSphere.rotation.y += dt * 0.22;
@@ -1411,8 +1328,8 @@ export default function MissionLaunchScene({
 
         const shipRefs = shipLanding.userData.spaceshipRefs;
         if (shipRefs) {
-          shipRefs.beaconMat.emissiveIntensity = 0.8 + 0.7 * Math.sin(localT * 4);
-          shipRefs.engineGlowMat.emissiveIntensity = 0.6 + 1.9 * fireFade;
+          shipRefs.beaconMat.emissiveIntensity = 0.4 + 0.35 * Math.sin(localT * 4);
+          shipRefs.engineGlowMat.emissiveIntensity = 0.4 + 1.2 * fireFade;
         }
 
         const groundBlastStrength =
@@ -1502,10 +1419,6 @@ export default function MissionLaunchScene({
 
         targetThrustAudio = 0.065 * fireFade + 0.0001;
         targetWindAudio = 0.048 * stormIntensity + 0.0001;
-
-        if (p >= 1 && afterTouch > 0.35 && !completed) {
-          setTouchdownReady(true);
-        }
       } else {
         // ACT 4: SLIDING DOORS OPEN -> HINGED RAMP UNFOLDS -> FULL-SCALE CREW DISEMBARKS -> FLAG PLANTED
         const localT = seqTime - (BOARDING_DURATION + TRANSIT_DURATION + LANDING_DURATION);
@@ -1574,15 +1487,14 @@ export default function MissionLaunchScene({
           activePreset.localZ
         );
 
-        let exited = 0;
-        const flagPlantTime = 5.6;
+        const flagPlantTime = 3.7;
         const isFlagLocked = localT >= flagPlantTime;
         flagTargetRing.visible = !isFlagLocked;
 
         disembarkCrew.forEach((member, idx) => {
-          const delay = idx === 0 ? 0.75 : 1.3 + idx * 0.52;
-          const rampDur = 1.65;
-          const groundDur = idx === 0 ? 1.85 : 1.5;
+          const delay = idx === 0 ? 0.45 : 0.85 + idx * 0.34;
+          const rampDur = 1.05;
+          const groundDur = idx === 0 ? 1.15 : 0.98;
 
           const tSinceStart = localT - delay;
           if (tSinceStart < 0) {
@@ -1591,11 +1503,9 @@ export default function MissionLaunchScene({
           }
 
           member.mesh.visible = true;
-          // NEVER shrink or pop astronaut scale!
           member.mesh.scale.setScalar(1);
           const refs = member.mesh.userData.animRefs;
 
-          // Commander Abubakr walks directly near selected flag site
           const destX = idx === 0 ? activePreset.localX - 0.68 : member.target.x;
           const destZ = idx === 0 ? activePreset.localZ + 0.16 : member.target.z;
 
@@ -1608,7 +1518,7 @@ export default function MissionLaunchScene({
             member.mesh.rotation.y = shipYaw;
 
             if (refs) {
-              const swing = Math.sin(localT * 9.5 + idx) * 0.52;
+              const swing = Math.sin(localT * 10 + idx) * 0.52;
               refs.leftLeg.rotation.x = swing;
               refs.rightLeg.rotation.x = -swing;
               refs.leftArm.rotation.x = -swing * 0.7;
@@ -1616,7 +1526,6 @@ export default function MissionLaunchScene({
               refs.selectionRing.visible = false;
             }
           } else {
-            exited += 1;
             const gp = THREE.MathUtils.clamp((tSinceStart - rampDur) / groundDur, 0, 1);
             const easeG = gp * gp * (3 - 2 * gp);
             const wx = THREE.MathUtils.lerp(rampBotX, destX, easeG);
@@ -1645,7 +1554,7 @@ export default function MissionLaunchScene({
                 if (idx === 0) {
                   if (localT < flagPlantTime) {
                     const plantP = THREE.MathUtils.clamp(
-                      (localT - (delay + rampDur + groundDur)) / 1.35,
+                      (localT - (delay + rampDur + groundDur)) / 1.0,
                       0,
                       1
                     );
@@ -1656,7 +1565,7 @@ export default function MissionLaunchScene({
                     refs.rightArm.rotation.x = liftAngle;
                     refs.leftArm.rotation.x = liftAngle * 0.75;
                   } else {
-                    const postP = THREE.MathUtils.clamp((localT - flagPlantTime) / 0.8, 0, 1);
+                    const postP = THREE.MathUtils.clamp((localT - flagPlantTime) / 0.75, 0, 1);
                     member.mesh.rotation.y = THREE.MathUtils.lerp(targetYaw, 0.15, postP);
                     refs.rightArm.rotation.x = THREE.MathUtils.lerp(-0.55, -2.05, postP);
                     refs.rightArm.rotation.z = THREE.MathUtils.lerp(0, -0.35, postP);
@@ -1676,7 +1585,7 @@ export default function MissionLaunchScene({
 
         if (isFlagLocked) {
           const sincePlant = localT - flagPlantTime;
-          const dropDrop = Math.max(0, 1 - sincePlant / 0.28);
+          const dropDrop = Math.max(0, 1 - sincePlant / 0.25);
           const fy = groundHeightAt(planetId, activePreset.localX, activePreset.localZ);
           plantedFlag.position.set(activePreset.localX, fy + dropDrop * 0.42, activePreset.localZ);
 
@@ -1685,23 +1594,14 @@ export default function MissionLaunchScene({
               Math.sin(localT * 3.4) * 0.18;
           }
 
-          const ringGrow = THREE.MathUtils.clamp(sincePlant / 0.9, 0, 1);
+          const ringGrow = THREE.MathUtils.clamp(sincePlant / 0.85, 0, 1);
           flagImpactRing.scale.setScalar(0.6 + ringGrow * 3.2);
           flagImpactRingMat.opacity = (1 - ringGrow) * 0.65;
         } else {
           flagImpactRingMat.opacity = 0;
         }
 
-        if (exited !== lastReportedDisembarked) {
-          lastReportedDisembarked = exited;
-          setDisembarkedCount(exited);
-        }
-        if (isFlagLocked !== lastReportedFlag) {
-          lastReportedFlag = isFlagLocked;
-          setFlagPlanted(isFlagLocked);
-        }
-
-        const camEase = THREE.MathUtils.clamp(localT / 6.5, 0, 1);
+        const camEase = THREE.MathUtils.clamp(localT / 5.2, 0, 1);
         _camPos.set(
           THREE.MathUtils.lerp(6.8, 3.2, camEase),
           THREE.MathUtils.lerp(3.2, 2.35, camEase),
@@ -1791,19 +1691,6 @@ export default function MissionLaunchScene({
     };
   }, [planetId]);
 
-  const stageLabel =
-    stage === 'boarding'
-      ? 'Phase 01 · Crew Boarding & Liftoff'
-      : stage === 'transit'
-      ? `Phase 02 · Earth → ${planet.name} Interplanetary Burn`
-      : stage === 'landing'
-      ? touchdownReady
-        ? `Touchdown Confirmed · ${planet.name} Dust Clearing`
-        : `Phase 03 · Retro-Fire Descent & ${planet.name} Landing`
-      : flagPlanted
-      ? `Phase 04 · Pakistan Flag Planted at ${selectedFlagPreset.siteLabel}`
-      : `Phase 04 · Crew Disembarking Down Ramp`;
-
   return (
     <div className="relative w-full h-screen overflow-hidden bg-[#05070C] text-slate-100 select-none">
       <div ref={mountRef} className="w-full h-full" />
@@ -1829,215 +1716,20 @@ export default function MissionLaunchScene({
         </div>
       )}
 
-      <header className="absolute top-0 inset-x-0 z-20 bg-[#0F1623]/92 border-b border-slate-800 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-mono uppercase tracking-wider text-sky-400 flex items-center gap-2">
-            <Rocket className="w-3.5 h-3.5" />
-            <span>
-              {planet.operationName} · Commander {playerName || 'Cadet'}
-            </span>
-          </div>
-          <h1 className="font-display text-lg sm:text-xl font-bold text-white">{stageLabel}</h1>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {onToggleAudio && (
-            <button
-              type="button"
-              onClick={onToggleAudio}
-              className="px-3 py-2 rounded-lg bg-[#07090E] border border-slate-700 hover:border-sky-500/60 text-slate-200 font-mono text-xs flex items-center gap-1.5 transition-colors whitespace-nowrap"
-            >
-              {isAudioMuted ? (
-                <VolumeX className="w-4 h-4 text-rose-400" />
-              ) : (
-                <Volume2 className="w-4 h-4 text-sky-400" />
-              )}
-              <span>{isAudioMuted ? 'Muted' : 'Voice On'}</span>
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              stopNasaSpeech();
-              onComplete({
-                siteLabel: selectedFlagPreset.siteLabel,
-                outpostX: selectedFlagPreset.outpostX,
-                outpostZ: selectedFlagPreset.outpostZ,
-              });
-            }}
-            className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-display font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
-          >
-            <SkipForward className="w-4 h-4" />
-            Enter Outpost
-          </button>
-        </div>
-      </header>
-
-      {/* Flag Site Selector Panel during Transit/Landing/Disembark */}
-      <div className="absolute top-20 right-4 z-20 w-[min(270px,90vw)] rounded-xl bg-[#0F1623]/94 border border-emerald-500/40 p-3 shadow-xl">
-        <div className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider text-emerald-400 mb-2">
-          <MapPin className="w-3.5 h-3.5" />
-          Flag Planting Location
-        </div>
-        <div className="space-y-1.5">
-          {FLAG_SITE_PRESETS.map((preset) => {
-            const active = selectedFlagId === preset.id;
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                disabled={flagPlanted}
-                onClick={() => setSelectedFlagId(preset.id)}
-                className={`w-full text-left px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-colors ${
-                  active
-                    ? 'bg-emerald-500/20 border-emerald-400 text-white font-semibold'
-                    : 'bg-[#07090E] border-slate-800 text-slate-300 hover:border-slate-600'
-                } ${flagPlanted ? 'opacity-70 cursor-not-allowed' : ''}`}
-              >
-                {preset.siteLabel}
-              </button>
-            );
-          })}
-        </div>
-        <div className="text-[10px] font-mono text-slate-400 mt-2">
-          {flagPlanted
-            ? 'Flag permanently anchored on outpost terrain.'
-            : 'Selected site remains permanently visible after landing.'}
-        </div>
-      </div>
-
-      {stage === 'transit' && (
-        <aside className="absolute top-20 left-4 z-20 w-[min(390px,92vw)] rounded-xl bg-[#0F1623]/94 border border-sky-500/40 p-3.5 shadow-xl">
-          <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-800">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider text-sky-400">
-                <Mic className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{briefing.officerName}</span>
-              </div>
-              <div className="text-[11px] font-mono text-slate-400 mt-0.5 truncate">
-                {isAudioMuted
-                  ? 'Audio Muted · Reading Transcript'
-                  : isVoiceSpeaking
-                  ? `Speaking · ${selectedVoiceLabel}`
-                  : `Briefing Active · ${selectedVoiceLabel}`}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (isAudioMuted && onToggleAudio) onToggleAudio();
-                else speakBriefing(briefing.spokenScript, false);
-              }}
-              className="px-2.5 py-1 rounded-md bg-sky-500/15 hover:bg-sky-500/25 border border-sky-400/50 text-sky-200 font-mono text-[11px] flex items-center gap-1 shrink-0 transition-colors"
-            >
-              <Volume2 className="w-3 h-3" />
-              {isAudioMuted ? 'Unmute' : 'Replay'}
-            </button>
-          </div>
-
-          <div className="mt-2.5 grid grid-cols-1 gap-2 text-xs">
-            <div className="flex items-start gap-2 rounded-lg bg-[#07090E]/90 border border-slate-800 px-2.5 py-1.5">
-              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <div className="text-[10px] font-mono uppercase text-slate-400">
-                  Destination ETA · Landing in {transitRemainingSec}s
-                </div>
-                <div className="font-mono text-amber-200 font-semibold">{briefing.etaLabel}</div>
-              </div>
-            </div>
-            <div className="flex items-start gap-2 rounded-lg bg-[#07090E]/90 border border-slate-800 px-2.5 py-1.5">
-              <CloudLightning className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <div className="text-[10px] font-mono uppercase text-slate-400">Weather Telemetry</div>
-                <div className="text-slate-200 leading-snug">{briefing.weatherLabel}</div>
-              </div>
-            </div>
-            <div className="flex items-start gap-2 rounded-lg bg-[#07090E]/90 border border-emerald-500/30 px-2.5 py-1.5">
-              <ShieldAlert className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <div className="text-[10px] font-mono uppercase text-emerald-400">
-                  Safety Precautions
-                </div>
-                <div className="text-slate-200 leading-snug">{briefing.precautionsLabel}</div>
-              </div>
-            </div>
-          </div>
-        </aside>
-      )}
-
-      <footer className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[min(940px,95vw)] rounded-xl bg-[#0F1623]/94 border border-slate-800 px-4 py-3 flex flex-col gap-2.5">
-        <div className="w-full h-1.5 rounded-full bg-[#07090E] border border-slate-800 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-sky-400 via-amber-400 to-emerald-400 transition-all duration-150"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {(
-              [
-                { id: 'boarding' as const, label: '01 Boarding', Icon: Users },
-                { id: 'transit' as const, label: `02 → ${planet.name}`, Icon: Globe },
-                { id: 'landing' as const, label: '03 Fire & Storm', Icon: Flame },
-                { id: 'disembark' as const, label: '04 Exit & Flag', Icon: Flag },
-              ]
-            ).map(({ id, label, Icon }) => {
-              const active = stage === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => jumpToStageRef.current?.(id)}
-                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono flex items-center gap-1.5 transition-colors whitespace-nowrap ${
-                    active
-                      ? 'bg-sky-500/20 border-sky-400 text-white font-semibold'
-                      : 'bg-[#07090E] border-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 text-sky-400" />
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-            {stage === 'boarding' && (
-              <span className="text-sky-400">
-                Boarded: {boardedCount}/{ASTRONAUTS.length} Astronauts
-              </span>
-            )}
-            {stage === 'transit' && (
-              <span className="text-amber-300 flex items-center gap-1.5">
-                <Flame className="w-3.5 h-3.5 text-amber-400" />
-                {briefing.etaLabel} · {transitRemainingSec}s
-              </span>
-            )}
-            {stage === 'landing' && (
-              <span className="text-emerald-300 flex items-center gap-1.5">
-                <Wind className="w-3.5 h-3.5 text-amber-400" />
-                {touchdownReady ? 'Touchdown Confirmed' : `Storm Descent · ${planet.name}`}
-              </span>
-            )}
-            {stage === 'disembark' && (
-              <span className="text-emerald-300 flex items-center gap-1.5">
-                {flagPlanted ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    Flag Anchored · {disembarkedCount}/{ASTRONAUTS.length} Out
-                  </>
-                ) : (
-                  <>
-                    <Flag className="w-3.5 h-3.5 text-amber-400" />
-                    Crew Exiting Ramp ({disembarkedCount}/{ASTRONAUTS.length})
-                  </>
-                )}
-              </span>
-            )}
-          </div>
-        </div>
-      </footer>
+      <button
+        type="button"
+        onClick={() => {
+          stopNasaSpeech();
+          onComplete({
+            siteLabel: selectedFlagPreset.siteLabel,
+            outpostX: selectedFlagPreset.outpostX,
+            outpostZ: selectedFlagPreset.outpostZ,
+          });
+        }}
+        className="fixed top-4 right-5 z-30 bg-transparent border-0 shadow-none p-1 text-xs font-mono tracking-wider text-white/25 hover:text-white/90 focus-visible:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/60 transition-opacity cursor-pointer"
+      >
+        Skip
+      </button>
     </div>
   );
 }

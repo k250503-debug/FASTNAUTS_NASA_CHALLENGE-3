@@ -2,11 +2,13 @@ import { ASTRONAUTS } from '../data/astronauts';
 import { DIFFICULTIES, getPlanetById } from '../data/planets';
 import { getBuildingDef } from '../data/buildings';
 import type {
+  AstronautCustomization,
   AstronautId,
   AstronautProgress,
   AstronautVitalState,
   BuildingTypeId,
   ConstructionMaterialId,
+  EquipmentId,
   MissionConfig,
   MissionState,
   PlacedBuilding,
@@ -15,6 +17,27 @@ import type {
   PlantedFlagState,
   SparePartId,
 } from '../types';
+
+export function createDefaultCrewCustomizations(
+  overrides?: Partial<Record<AstronautId, AstronautCustomization>>
+): Record<AstronautId, AstronautCustomization> {
+  return ASTRONAUTS.reduce((acc, astro, idx) => {
+    const existing = overrides?.[astro.id];
+    acc[astro.id] = existing || {
+      suitDesign: idx % 3 === 0 ? 'artemis_eva' : idx % 3 === 1 ? 'tactical_recon' : 'cryo_heavy',
+      helmetStyle: idx === 0 ? 'gold_reflective' : idx % 2 === 0 ? 'gold_reflective' : 'tinted_obsidian',
+      primaryColorHex: 0xd9e0e8,
+      accentColorHex: astro.accentHex,
+      backpackStyle:
+        astro.id === 'om' || astro.id === 'jawwad'
+          ? 'science_pack'
+          : astro.id === 'abubakr'
+          ? 'dual_thruster'
+          : 'plss_standard',
+    };
+    return acc;
+  }, {} as Record<AstronautId, AstronautCustomization>);
+}
 
 export const SAVE_STORAGE_KEY = 'astra_saved_mission_v2';
 
@@ -360,7 +383,7 @@ export function createInitialMissionState(
     status: 'active',
     failureReason: null,
 
-    activeAstronautId: 'abubakr',
+    activeAstronautId: config.selectedCommanderId || 'abubakr',
     crewProgress,
     crewVitals,
     stormFlue: {
@@ -448,6 +471,8 @@ export function createInitialMissionState(
     },
 
     achievements: [],
+    crewCustomizations: createDefaultCrewCustomizations(config.crewCustomizations),
+    equipmentInventory: config.preselectedEquipment ? [...config.preselectedEquipment] : ['solar_array', 'solar_water_cycle'],
 
     techUpgrades: {
       waterEfficiencyBonus: 0,
@@ -542,6 +567,12 @@ export function loadSavedMission(): MissionState | null {
     const parsed = JSON.parse(raw) as MissionState;
     if (!parsed || !parsed.planetId || !parsed.buildings) return null;
     parsed.buildings = parsed.buildings.map((b) => normalizePlacedBuilding(b));
+    if (!parsed.crewCustomizations) {
+      parsed.crewCustomizations = createDefaultCrewCustomizations();
+    }
+    if (!parsed.equipmentInventory) {
+      parsed.equipmentInventory = ['solar_array', 'solar_water_cycle'];
+    }
     return parsed;
   } catch {
     return null;
