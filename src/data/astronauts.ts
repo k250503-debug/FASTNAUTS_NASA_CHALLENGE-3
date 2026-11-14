@@ -1,0 +1,103 @@
+import type { AstronautId, AstronautProfile } from '../types';
+
+export const ASTRONAUTS: AstronautProfile[] = [
+  {
+    id: 'abubakr',
+    name: 'Abubakr',
+    role: 'Mission Commander & Storm Flue Lead',
+    assignedWorldId: 'mars',
+    assignedWorldName: 'Mars (Jezero Crater)',
+    nasaRequirement: 'NASA Mars Dust-Storm & Atmospheric Flue Compliance',
+    taskTitle: 'Inspect & Clear Storm Flue',
+    taskDescription:
+      'Monitors exhaust pressure, clears iron-oxide dust clogs in the outpost storm flue, and coordinates crew survival.',
+    specialtyBonus: 'Clears 100% of Storm Flue clogs & restores +6 kWh airflow efficiency',
+    suitColor: '#38BDF8',
+    accentHex: 0x38bdf8,
+    startX: -3.5,
+    startZ: 4.5,
+  },
+  {
+    id: 'affan',
+    name: 'Affan',
+    role: 'Lunar ISRU & Polar Ice Engineer',
+    assignedWorldId: 'moon',
+    assignedWorldName: 'The Moon (Shackleton Crater)',
+    nasaRequirement: 'NASA Artemis Lunar South Pole Water-Ice Extraction',
+    taskTitle: 'Extract Polar Ice & Regolith O₂',
+    taskDescription:
+      'Operates regolith drills and water-ice purifiers at lunar crater rims to eliminate Earth resupply dependence.',
+    specialtyBonus: 'Extracts +8 Water & +5 Oxygen when inspecting ISRU / Data sites',
+    suitColor: '#22D3EE',
+    accentHex: 0x22d3ee,
+    startX: 3.5,
+    startZ: 4.2,
+  },
+  {
+    id: 'ali',
+    name: 'Ali',
+    role: 'Solar Grid & Energy Systems Officer',
+    assignedWorldId: 'moon',
+    assignedWorldName: 'The Moon (Peak of Eternal Light)',
+    nasaRequirement: 'NASA Deep-Space Power & Battery Continuity',
+    taskTitle: 'Calibrate Solar & Battery Bus',
+    taskDescription:
+      'Aligns photovoltaic arrays and manages battery storage banks to prevent brownouts during shadowed cycles.',
+    specialtyBonus: 'Restores +14 kWh Battery & clears frost/dust off power modules',
+    suitColor: '#F59E0B',
+    accentHex: 0xf59e0b,
+    startX: -6.2,
+    startZ: -1.8,
+  },
+  {
+    id: 'jawwad',
+    name: 'Jawwad',
+    role: 'Bio-Regenerative & Water Loop Officer',
+    assignedWorldId: 'mars',
+    assignedWorldName: 'Mars (Closed-Loop Greenhouse)',
+    nasaRequirement: 'NASA BLSS Food Production & 98% Water Recovery',
+    taskTitle: 'Optimize Greenhouse & Recycling',
+    taskDescription:
+      'Balances hydroponic crop transpiration against closed-loop water recycling and cabin oxygen regeneration.',
+    specialtyBonus: '+7 Food & +5 Water boost when servicing life-support modules',
+    suitColor: '#10B981',
+    accentHex: 0x10b981,
+    startX: -2.2,
+    startZ: -5.4,
+  },
+  {
+    id: 'om',
+    name: 'Om',
+    role: 'Radiation Shielding & Comms Officer',
+    assignedWorldId: 'europa',
+    assignedWorldName: 'Europa (Jupiter Moon · Conamara)',
+    nasaRequirement: 'NASA Europa Radiation Belt & Deep-Space Telemetry',
+    taskTitle: 'Log Radiation & Calibrate Comms',
+    taskDescription:
+      'Measures cosmic and Jovian radiation flux, reinforces sintered shielding, and keeps Earth uplink locked.',
+    specialtyBonus: 'Reduces Crew Radiation Exposure by -6% & gains +8 Science Points',
+    suitColor: '#F43F5E',
+    accentHex: 0xf43f5e,
+    startX: 2.8,
+    startZ: -5.2,
+  },
+  {
+    id: 'ammar',
+    name: 'Ammar',
+    role: 'Cryogenic Systems & Titan Telemetry Officer',
+    assignedWorldId: 'titan',
+    assignedWorldName: 'Titan (Shangri-La Dunes)',
+    nasaRequirement: 'NASA Titan Hydrocarbon & Cryo-Vent Analysis',
+    taskTitle: 'Sample Methane Haze & De-Ice Vents',
+    taskDescription:
+      'Calibrates cryogenic sensors across hydrocarbon dunes, purges frozen methane vents, and monitors deep-space battery storage.',
+    specialtyBonus: 'Restores +6 kWh Battery, clears -20% Storm Flue clog & +6 Science Points',
+    suitColor: '#A855F7',
+    accentHex: 0xa855f7,
+    startX: -5.4,
+    startZ: 3.6,
+  },
+];
+
+export const getAstronautById = (id: AstronautId): AstronautProfile =>
+  ASTRONAUTS.find((a) => a.id === id) || ASTRONAUTS[0];

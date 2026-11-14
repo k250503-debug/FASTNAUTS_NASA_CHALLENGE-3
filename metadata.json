@@ -1,0 +1,6 @@
+{
+  "name": "ASTRA: Mission Control",
+  "description": "Junior Astronaut Mission Trainer — Build a Moon or Mars ISRU outpost, manage interconnected life-support systems, resolve space emergencies, and learn real aerospace STEM engineering.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

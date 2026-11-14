@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --color-space-950: #07090E;
+  --color-space-900: #0F1623;
+  --color-space-800: #161F30;
+  --color-space-700: #1E293B;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: #07090E;
+    color: #F1F5F9;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+}
+
+.hud-grid {
+  background-image:
+    linear-gradient(to right, rgba(56, 189, 248, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(56, 189, 248, 0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes astraPortraitFloat {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -5px, 0);
+  }
+}
+
+@keyframes astraProgressSweep {
+  0% {
+    stroke-dashoffset: var(--ring-circumference, 88);
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes astraHandLeftWork {
+  0%, 100% {
+    transform: rotate(0deg) translate3d(0, 0, 0);
+  }
+  25% {
+    transform: rotate(-28deg) translate3d(1px, -2px, 0);
+  }
+  50% {
+    transform: rotate(-10deg) translate3d(2px, 0, 0);
+  }
+  75% {
+    transform: rotate(-34deg) translate3d(1px, -3px, 0);
+  }
+}
+
+@keyframes astraHandRightWork {
+  0%, 100% {
+    transform: rotate(-12deg) translate3d(0, 0, 0);
+  }
+  25% {
+    transform: rotate(-38deg) translate3d(2px, -3px, 0);
+  }
+  50% {
+    transform: rotate(-16deg) translate3d(1px, 1px, 0);
+  }
+  75% {
+    transform: rotate(-42deg) translate3d(3px, -2px, 0);
+  }
+}
+
+@keyframes astraVisorNod {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  35% {
+    transform: rotate(7deg);
+  }
+  70% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes astraWorkSpark {
+  0%, 100% {
+    opacity: 0.25;
+    transform: scale(0.75);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes astraFlueSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes astraTaskProgressFill {
+  0% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+.astra-portrait-float {
+  animation: astraPortraitFloat 1.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+.astra-progress-ring {
+  stroke-dasharray: var(--ring-circumference, 88);
+  stroke-dashoffset: var(--ring-circumference, 88);
+  animation: astraProgressSweep var(--duty-duration, 2.6s) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.astra-hand-left {
+  transform-box: fill-box;
+  transform-origin: 20% 25%;
+  animation: astraHandLeftWork 0.72s ease-in-out infinite;
+}
+
+.astra-hand-right {
+  transform-box: fill-box;
+  transform-origin: 20% 25%;
+  animation: astraHandRightWork 0.64s ease-in-out infinite;
+}
+
+.astra-visor-nod {
+  transform-box: fill-box;
+  transform-origin: 50% 75%;
+  animation: astraVisorNod 1.3s ease-in-out infinite;
+}
+
+.astra-work-spark {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: astraWorkSpark 0.48s ease-in-out infinite;
+}
+
+.astra-flue-spin {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: astraFlueSpin 0.9s linear infinite;
+}
+
+.astra-task-progress-bar {
+  transform-origin: left center;
+  animation: astraTaskProgressFill var(--duty-duration, 2.6s) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,160 @@
+import type { BuildingDef, BuildingTypeId } from '../types';
+
+export const BUILDINGS: BuildingDef[] = [
+  {
+    id: 'habitat',
+    name: 'Habitat Module',
+    shortName: 'Habitat',
+    category: 'Core Life Support',
+    cost: 220,
+    powerReq: 8,
+    waterReq: 0,
+    produces: { oxygen: 7, water: 4, food: 0 },
+    shieldingBonus: 25,
+    batteryBonus: 0,
+    maxPerBase: 2,
+    required: true,
+    benefit:
+      'Pressurized crew quarters with baseline air scrubbing and greywater recovery. Required for mission launch.',
+    tradeOff:
+      'Draws steady baseline electricity; a second habitat expands oxygen scrubbing and shielding.',
+    upgradeCost: 140,
+  },
+  {
+    id: 'solar',
+    name: 'Solar Power Array',
+    shortName: 'Solar Array',
+    category: 'Power Generation',
+    cost: 160,
+    powerReq: 0,
+    powerGen: 34,
+    waterReq: 0,
+    produces: { oxygen: 0, water: 0, food: 0 },
+    shieldingBonus: 0,
+    batteryBonus: 0,
+    maxPerBase: 4,
+    required: true,
+    benefit:
+      'Converts sunlight into electrical power for life support, recycling, and ISRU extraction equipment.',
+    tradeOff:
+      'Output drops during lunar shadow cycles or Martian dust storms — pair with Battery Storage.',
+    upgradeCost: 110,
+  },
+  {
+    id: 'battery',
+    name: 'Battery Storage Bank',
+    shortName: 'Battery Bank',
+    category: 'Energy Storage',
+    cost: 140,
+    powerReq: 0,
+    waterReq: 0,
+    produces: { oxygen: 0, water: 0, food: 0 },
+    shieldingBonus: 0,
+    batteryBonus: 70,
+    maxPerBase: 3,
+    required: false,
+    benefit:
+      'Stores surplus solar electricity during peak sunlight to keep critical life support online during darkness.',
+    tradeOff:
+      'Generates no electricity on its own, but prevents brownouts during lunar shadow or dust storms.',
+    upgradeCost: 100,
+  },
+  {
+    id: 'water_recycler',
+    name: 'Water Recycling System',
+    shortName: 'Water Recycler',
+    category: 'Closed-Loop Life Support',
+    cost: 200,
+    powerReq: 7,
+    waterReq: 0,
+    produces: { oxygen: 0, water: 11, food: 0 },
+    shieldingBonus: 0,
+    batteryBonus: 0,
+    maxPerBase: 2,
+    required: false,
+    benefit:
+      'Purifies crew wastewater and cabin humidity back into clean drinking and greenhouse irrigation water.',
+    tradeOff:
+      'Dramatically slows water depletion, yet shuts down to 45% efficiency during power brownouts.',
+    upgradeCost: 130,
+  },
+  {
+    id: 'greenhouse',
+    name: 'Hydroponic Greenhouse',
+    shortName: 'Greenhouse',
+    category: 'Food & Bio-Regeneration',
+    cost: 220,
+    powerReq: 9,
+    waterReq: 5,
+    produces: { oxygen: 4, water: 0, food: 7 },
+    shieldingBonus: 0,
+    batteryBonus: 0,
+    maxPerBase: 2,
+    required: false,
+    benefit:
+      'Cultivates fresh crops for crew nutrition while naturally generating supplemental oxygen.',
+    tradeOff:
+      'Classic engineering trade-off: solves food shortages, yet increases electricity and water demand.',
+    upgradeCost: 140,
+  },
+  {
+    id: 'isru_plant',
+    name: 'ISRU Regolith & Ice Plant',
+    shortName: 'ISRU Extractor',
+    category: 'Planetary ISRU',
+    cost: 250,
+    powerReq: 10,
+    waterReq: 0,
+    produces: { oxygen: 6, water: 6, food: 0 },
+    shieldingBonus: 10,
+    batteryBonus: 0,
+    maxPerBase: 2,
+    required: false,
+    benefit:
+      'Extracts oxygen from regolith oxides, mines water ice, and sinters lunar/Martian dust into radiation armor.',
+    tradeOff:
+      'Highest electrical power draw on the base, but enables genuine planetary self-sufficiency.',
+    upgradeCost: 160,
+  },
+  {
+    id: 'radiation_shelter',
+    name: 'Radiation Shelter',
+    shortName: 'Rad Shelter',
+    category: 'Crew Protection',
+    cost: 180,
+    powerReq: 4,
+    waterReq: 0,
+    produces: { oxygen: 0, water: 0, food: 0 },
+    shieldingBonus: 35,
+    batteryBonus: 0,
+    maxPerBase: 2,
+    required: false,
+    benefit:
+      'High-mass shielded safe haven protecting astronauts during solar particle events and cosmic radiation.',
+    tradeOff:
+      'Produces no consumables, but prevents long-term crew radiation illness.',
+    upgradeCost: 120,
+  },
+  {
+    id: 'comms',
+    name: 'Deep-Space Comms Array',
+    shortName: 'Comms Array',
+    category: 'Operations & Telemetry',
+    cost: 130,
+    powerReq: 4,
+    waterReq: 0,
+    produces: { oxygen: 0, water: 0, food: 0 },
+    shieldingBonus: 0,
+    batteryBonus: 0,
+    maxPerBase: 1,
+    required: false,
+    benefit:
+      'Maintains high-bandwidth Earth link for solar weather alerts, research science points, and resupply coordination.',
+    tradeOff:
+      'Consumes steady power while boosting daily science generation and hazard warning lead time.',
+    upgradeCost: 90,
+  },
+];
+
+export const getBuildingDef = (id: BuildingTypeId): BuildingDef | undefined =>
+  BUILDINGS.find((b) => b.id === id);
