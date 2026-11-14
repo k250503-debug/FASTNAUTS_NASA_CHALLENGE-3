@@ -13,6 +13,7 @@ import {
 } from './models';
 import { createTerrainAndSkyGroup, getPlanetEnvironmentSpec, groundHeightAt } from './terrain';
 import { playSpaceSfx } from '../utils/spaceAudio';
+import { useTourSoundtrack } from '../utils/useTourSoundtrack';
 import type { PlanetId } from '../types';
 
 interface CinematicStorySceneProps {
@@ -50,6 +51,14 @@ export default function CinematicStoryScene({
   const [progress01, setProgress01] = useState(0);
   const [storyFinished, setStoryFinished] = useState(false);
   const [webglFailed, setWebglFailed] = useState(false);
+  const [storyReplaySignal, setStoryReplaySignal] = useState(0);
+
+  useTourSoundtrack({
+    enabled: true,
+    muted: isAudioMuted,
+    volume: 0.52,
+    restartSignal: storyReplaySignal,
+  });
 
   const planetIdRef = useRef<PlanetId>(planetId);
   planetIdRef.current = planetId;
@@ -539,6 +548,7 @@ export default function CinematicStoryScene({
             onClick={() => {
               playSpaceSfx('ui_click', isAudioMuted);
               restartRef.current?.();
+              setStoryReplaySignal((s) => s + 1);
             }}
             className="px-3 py-1.5 rounded-lg bg-[#07090E]/90 border border-slate-700 hover:border-sky-400 text-xs font-mono text-slate-200 flex items-center gap-1.5"
           >

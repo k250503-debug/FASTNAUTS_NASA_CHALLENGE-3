@@ -12,7 +12,26 @@ import { createAAARenderPipeline, detectSoftwareWebGL } from './postfx';
 import { createTerrainAndSkyGroup, getPlanetEnvironmentSpec, groundHeightAt } from './terrain';
 import type { BuildingTypeId, PlacedBuilding, PlanetId } from '../types';
 
-export type CoreInfraTypeId = 'habitat' | 'solar' | 'water_recycler' | 'greenhouse';
+export const ALL_BUILDER_MODULE_IDS: BuildingTypeId[] = [
+  'habitat',
+  'solar',
+  'water_recycler',
+  'greenhouse',
+  'radiation_shelter',
+  'battery',
+  'isru_plant',
+  'comms',
+  'medical_station',
+  'workshop',
+  'fuel_depot',
+  'rover_garage',
+  'research_lab',
+  'storage_depot',
+];
+
+export const BUILDER_PAD_CELL_SLOTS: number[] = [
+  5, 6, 9, 10, 1, 2, 4, 7, 8, 11, 0, 3, 12, 13, 14, 15,
+];
 
 export function getBuilderBuildingPos(cellIndex: number): { x: number; z: number } {
   const col = cellIndex % 4;
@@ -24,10 +43,10 @@ export function getBuilderBuildingPos(cellIndex: number): { x: number; z: number
 }
 
 /**
- * Generates crisp 3D isometric thumbnail data URLs for the 4 core infrastructure modules
+ * Generates crisp 3D isometric thumbnail data URLs for all outpost modules
  * using one ephemeral WebGLRenderer (immediately disposed, zero persistent extra contexts).
  */
-export function renderCoreModuleThumbnails(): Partial<Record<CoreInfraTypeId, string>> {
+export function renderAllModuleThumbnails(): Partial<Record<BuildingTypeId, string>> {
   if (typeof document === 'undefined' || detectSoftwareWebGL()) return {};
   try {
     const width = 360;
@@ -44,7 +63,7 @@ export function renderCoreModuleThumbnails(): Partial<Record<CoreInfraTypeId, st
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 40);
-    camera.position.set(3.4, 2.55, 3.85);
+    camera.position.set(3.45, 2.6, 3.9);
     camera.lookAt(0, 0.95, 0);
 
     const pmrem = new THREE.PMREMGenerator(renderer);
@@ -64,12 +83,14 @@ export function renderCoreModuleThumbnails(): Partial<Record<CoreInfraTypeId, st
 
     const shadowTex = createContactShadowTexture();
     const solarTex = createSolarGridTexture(2);
-    const ids: CoreInfraTypeId[] = ['habitat', 'solar', 'water_recycler', 'greenhouse'];
-    const result: Partial<Record<CoreInfraTypeId, string>> = {};
+    const result: Partial<Record<BuildingTypeId, string>> = {};
 
-    ids.forEach((id) => {
+    ALL_BUILDER_MODULE_IDS.forEach((id) => {
       const mesh = createBuildingMesh(id, 1, true, shadowTex, solarTex);
-      mesh.rotation.y = id === 'habitat' ? -0.35 : 0.28;
+      mesh.rotation.y =
+        id === 'habitat' || id === 'radiation_shelter' || id === 'medical_station'
+          ? -0.35
+          : 0.28;
       scene.add(mesh);
       renderer.render(scene, camera);
       result[id] = renderer.domElement.toDataURL('image/png');
@@ -95,6 +116,8 @@ export function renderCoreModuleThumbnails(): Partial<Record<CoreInfraTypeId, st
     return {};
   }
 }
+
+export const renderCoreModuleThumbnails = renderAllModuleThumbnails;
 
 interface BuiltAnimEntry {
   uid: string;
@@ -165,7 +188,7 @@ export default function OutpostBuilderScene3D({
       0.2,
       200
     );
-    camera.position.set(10.5, 8.8, 13.5);
+    camera.position.set(11.2, 9.4, 14.6);
 
     const pipeline = createAAARenderPipeline(container, scene, camera, {
       bloomStrength: 0.08,
@@ -180,7 +203,7 @@ export default function OutpostBuilderScene3D({
     controls.dampingFactor = 0.08;
     controls.maxPolarAngle = Math.PI * 0.455;
     controls.minDistance = 6.5;
-    controls.maxDistance = 30;
+    controls.maxDistance = 32;
     controls.target.set(0, 0.9, 0);
 
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
@@ -223,19 +246,18 @@ export default function OutpostBuilderScene3D({
     let terrainBundle: ReturnType<typeof createTerrainAndSkyGroup> | null = null;
     let currentPlanetId: PlanetId | null = null;
 
-    // Subtle holographic construction pads on the terrain
+    // Subtle holographic construction pads on the terrain (all 16 grid positions)
     const padsGroup = new THREE.Group();
     scene.add(padsGroup);
     const padRings: THREE.Mesh[] = [];
-    const padSlotIndices = [5, 6, 9, 10, 1, 2, 4, 7, 8, 11];
-    padSlotIndices.forEach((cellIdx) => {
+    BUILDER_PAD_CELL_SLOTS.forEach((cellIdx) => {
       const p = getBuilderBuildingPos(cellIdx);
       const ringGeo = new THREE.RingGeometry(1.48, 1.66, 36);
       ringGeo.rotateX(-Math.PI / 2);
       const ringMat = new THREE.MeshBasicMaterial({
         color: 0x38bdf8,
         transparent: true,
-        opacity: 0.2,
+        opacity: 0.18,
         side: THREE.DoubleSide,
       });
       const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -280,7 +302,12 @@ export default function OutpostBuilderScene3D({
       const ringGeo = new THREE.RingGeometry(1.1, 1.55, 36);
       ringGeo.rotateX(-Math.PI / 2);
       const dustRingMat = new THREE.MeshBasicMaterial({
-        color: planetRef.current === 'mars' ? 0xfb923c : planetRef.current === 'titan' ? 0xfacc15 : 0xbae6fd,
+        color:
+          planetRef.current === 'mars'
+            ? 0xfb923c
+            : planetRef.current === 'titan'
+            ? 0xfacc15
+            : 0xbae6fd,
         transparent: true,
         opacity: 0.75,
         side: THREE.DoubleSide,
@@ -298,7 +325,12 @@ export default function OutpostBuilderScene3D({
       const dustGeo = new THREE.BufferGeometry();
       dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
       const dustParticlesMat = new THREE.PointsMaterial({
-        color: planetRef.current === 'mars' ? 0xfdba74 : planetRef.current === 'titan' ? 0xfde047 : 0xe2e8f0,
+        color:
+          planetRef.current === 'mars'
+            ? 0xfdba74
+            : planetRef.current === 'titan'
+            ? 0xfde047
+            : 0xe2e8f0,
         size: 0.24,
         transparent: true,
         opacity: 0.75,
@@ -311,6 +343,10 @@ export default function OutpostBuilderScene3D({
       if (b.typeId === 'greenhouse') {
         growLight = new THREE.PointLight(0x4ade80, 0, 5.5, 1.8);
         growLight.position.set(0, 0.9, 0);
+        root.add(growLight);
+      } else if (b.typeId === 'radiation_shelter') {
+        growLight = new THREE.PointLight(0xf59e0b, 0, 4.5, 1.8);
+        growLight.position.set(0, 0.85, 1.25);
         root.add(growLight);
       }
 
@@ -376,7 +412,7 @@ export default function OutpostBuilderScene3D({
       terrainBundle = createTerrainAndSkyGroup(id, maxAnisotropy);
       envGroup.add(terrainBundle.group);
 
-      padSlotIndices.forEach((cellIdx, i) => {
+      BUILDER_PAD_CELL_SLOTS.forEach((cellIdx, i) => {
         const p = getBuilderBuildingPos(cellIdx);
         padRings[i].position.y = groundHeightAt(id, p.x, p.z) + 0.04;
       });
@@ -424,9 +460,9 @@ export default function OutpostBuilderScene3D({
         entry.age += dt;
         const p = Math.min(1, entry.age / entry.duration);
         const easeOut = 1 - Math.pow(1 - p, 3);
+        const isFocused = focusRef.current === entry.typeId;
 
         if (entry.typeId === 'habitat') {
-          // Habitat descends gently, unfolds structure, cycles airlock doors, bursts dust ring
           const dropY = (1 - easeOut) * 3.4;
           entry.mesh.position.y = dropY;
           entry.mesh.scale.set(
@@ -434,39 +470,100 @@ export default function OutpostBuilderScene3D({
             0.4 + 0.6 * easeOut,
             0.55 + 0.45 * easeOut
           );
-          const doorCycle = p > 0.55 && p < 0.92 ? Math.sin(((p - 0.55) / 0.37) * Math.PI) : 0;
+          const doorCycle =
+            p > 0.55 && p < 0.92 ? Math.sin(((p - 0.55) / 0.37) * Math.PI) : 0;
           setShelterDoorsOpen(entry.mesh, doorCycle);
+        } else if (entry.typeId === 'radiation_shelter') {
+          // Heavy armored bunker drops solidly onto pad and cycles its blast doors
+          const dropY = (1 - easeOut) * 3.1;
+          entry.mesh.position.y = dropY;
+          entry.mesh.scale.set(
+            0.7 + 0.3 * easeOut,
+            0.45 + 0.55 * easeOut,
+            0.7 + 0.3 * easeOut
+          );
+          const doorCycle =
+            p > 0.52 && p < 0.94 ? Math.sin(((p - 0.52) / 0.42) * Math.PI) : 0;
+          setShelterDoorsOpen(entry.mesh, doorCycle);
+          if (entry.growLight) {
+            entry.growLight.intensity = 0.7 * easeOut + 0.25 * doorCycle;
+          }
         } else if (entry.typeId === 'solar') {
-          // Solar mast rises vertically then wings unfold smoothly toward sunlight
           const mastP = Math.min(1, p / 0.48);
           const wingP = Math.max(0, Math.min(1, (p - 0.35) / 0.65));
           const mastEase = 1 - Math.pow(1 - mastP, 3);
           const wingEase = 1 - Math.pow(1 - wingP, 3);
           entry.mesh.position.y = 0;
-          entry.mesh.scale.set(0.28 + 0.72 * wingEase, 0.15 + 0.85 * mastEase, 0.5 + 0.5 * wingEase);
+          entry.mesh.scale.set(
+            0.28 + 0.72 * wingEase,
+            0.15 + 0.85 * mastEase,
+            0.5 + 0.5 * wingEase
+          );
           entry.mesh.rotation.y = Math.sin(elapsed * 0.35 + entry.x) * 0.14;
         } else if (entry.typeId === 'water_recycler') {
-          // Condenser units rise and pipe seats cleanly; indicator beacon pulses
           const assembleEase = 1 - Math.pow(1 - p, 3);
           entry.mesh.position.y = (1 - assembleEase) * 1.4;
-          entry.mesh.scale.set(0.65 + 0.35 * assembleEase, 0.25 + 0.75 * assembleEase, 0.65 + 0.35 * assembleEase);
-          const refs = entry.mesh.userData.buildingRefs as { statusMat?: THREE.MeshStandardMaterial } | undefined;
+          entry.mesh.scale.set(
+            0.65 + 0.35 * assembleEase,
+            0.25 + 0.75 * assembleEase,
+            0.65 + 0.35 * assembleEase
+          );
+          const refs = entry.mesh.userData.buildingRefs as
+            | { statusMat?: THREE.MeshStandardMaterial }
+            | undefined;
           if (refs?.statusMat) {
             refs.statusMat.color.setHex(0x22d3ee);
             refs.statusMat.emissive.setHex(0x06b6d4);
             refs.statusMat.emissiveIntensity = 0.55 + 0.35 * Math.sin(elapsed * 3.5);
           }
         } else if (entry.typeId === 'greenhouse') {
-          // Crops rise inside, warm grow-light comes online, dome settles cleanly
           const cropEase = 1 - Math.pow(1 - Math.min(1, p / 0.7), 3);
           entry.mesh.position.y = 0;
-          entry.mesh.scale.set(0.7 + 0.3 * easeOut, 0.22 + 0.78 * cropEase, 0.7 + 0.3 * easeOut);
+          entry.mesh.scale.set(
+            0.7 + 0.3 * easeOut,
+            0.22 + 0.78 * cropEase,
+            0.7 + 0.3 * easeOut
+          );
           if (entry.growLight) {
             entry.growLight.intensity = 1.4 * easeOut + Math.sin(elapsed * 2.2) * 0.15;
           }
+        } else if (entry.typeId === 'comms') {
+          entry.mesh.position.y = (1 - easeOut) * 1.1;
+          entry.mesh.scale.set(0.6 + 0.4 * easeOut, 0.2 + 0.8 * easeOut, 0.6 + 0.4 * easeOut);
+          entry.mesh.rotation.y = Math.sin(elapsed * 0.45 + entry.z) * 0.28;
+        } else if (entry.typeId === 'isru_plant') {
+          entry.mesh.position.y = (1 - easeOut) * 2.2;
+          entry.mesh.scale.set(0.65 + 0.35 * easeOut, 0.3 + 0.7 * easeOut, 0.65 + 0.35 * easeOut);
+          if (p < 0.95) {
+            entry.mesh.rotation.y = (1 - easeOut) * Math.PI * 1.5;
+          }
+        } else if (entry.typeId === 'battery') {
+          entry.mesh.position.y = (1 - easeOut) * 1.8;
+          entry.mesh.scale.set(0.7 + 0.3 * easeOut, 0.25 + 0.75 * easeOut, 0.7 + 0.3 * easeOut);
+          const refs = entry.mesh.userData.buildingRefs as
+            | { statusMat?: THREE.MeshStandardMaterial }
+            | undefined;
+          if (refs?.statusMat) {
+            refs.statusMat.color.setHex(0xf59e0b);
+            refs.statusMat.emissive.setHex(0xf59e0b);
+            refs.statusMat.emissiveIntensity = 0.5 + 0.4 * Math.sin(elapsed * 4.0);
+          }
         } else {
-          entry.mesh.position.y = (1 - easeOut) * 1.6;
-          entry.mesh.scale.setScalar(0.5 + 0.5 * easeOut);
+          entry.mesh.position.y = (1 - easeOut) * 2.2;
+          entry.mesh.scale.set(
+            0.6 + 0.4 * easeOut,
+            0.35 + 0.65 * easeOut,
+            0.6 + 0.4 * easeOut
+          );
+        }
+
+        // Subtle focus beacon pulse when hovering a module card
+        const refs = entry.mesh.userData.buildingRefs as
+          | { beacon?: THREE.Mesh }
+          | undefined;
+        if (refs?.beacon) {
+          const pulse = isFocused ? 1.45 + 0.35 * Math.sin(elapsed * 6) : 1.0;
+          refs.beacon.scale.setScalar(pulse);
         }
 
         // Dust impact ring & radial construction particles during assembly

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import UniverseOverlayHUD from '../components/UniverseOverlayHUD';
 import UniverseScene3D, { type UniverseExperienceMode } from '../three/UniverseScene3D';
+import { useTourSoundtrack } from '../utils/useTourSoundtrack';
 import type { PlanetId } from '../types';
 
 interface UniverseExperienceProps {
@@ -33,6 +34,13 @@ export default function UniverseExperience({
   const [replaySignal, setReplaySignal] = useState(0);
   const [overviewSignal, setOverviewSignal] = useState(0);
   const [webglFailed, setWebglFailed] = useState(false);
+
+  useTourSoundtrack({
+    enabled: true,
+    muted: isAudioMuted,
+    volume: mode === 'interactive' ? 0.38 : 0.55,
+    restartSignal: replaySignal,
+  });
 
   const handleSkipJourney = () => {
     setMode('click_to_start');

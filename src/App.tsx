@@ -190,7 +190,7 @@ export default function App() {
       };
     };
 
-    if ((screen === 'mission' || screen === 'landing') && !isAudioMuted) startAmbientHum();
+    if (screen === 'mission' && !isAudioMuted) startAmbientHum();
     else stopAmbientHum();
 
     return () => {
