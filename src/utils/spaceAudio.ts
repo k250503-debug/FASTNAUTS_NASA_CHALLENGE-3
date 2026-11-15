@@ -98,30 +98,50 @@ export function playSpaceSfx(kind: SpaceSfxKind, muted = false): void {
     }
 
     if (kind === 'thruster') {
-      const bufferSize = Math.floor(ctx.sampleRate * 0.9);
+      const bufferSize = Math.floor(ctx.sampleRate * 2.4);
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
+      let lastOut = 0;
       for (let i = 0; i < bufferSize; i++) {
-        data[i] = (Math.random() * 2 - 1) * 0.65;
+        const w = Math.random() * 2 - 1;
+        lastOut = (lastOut + 0.06 * w) / 1.06;
+        data[i] = Math.max(-1, Math.min(1, lastOut * 2.8));
       }
       const noise = ctx.createBufferSource();
       noise.buffer = buffer;
 
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(190, now);
-      filter.frequency.exponentialRampToValueAtTime(85, now + 0.85);
+      filter.frequency.setValueAtTime(240, now);
+      filter.frequency.exponentialRampToValueAtTime(110, now + 2.3);
 
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(0.11, now + 0.14);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
+      gain.gain.linearRampToValueAtTime(0.16, now + 0.28);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
+
+      const subOsc = ctx.createOscillator();
+      subOsc.type = 'sawtooth';
+      subOsc.frequency.setValueAtTime(42, now);
+      const subFilter = ctx.createBiquadFilter();
+      subFilter.type = 'lowpass';
+      subFilter.frequency.setValueAtTime(95, now);
+      const subGain = ctx.createGain();
+      subGain.gain.setValueAtTime(0.001, now);
+      subGain.gain.linearRampToValueAtTime(0.075, now + 0.25);
+      subGain.gain.exponentialRampToValueAtTime(0.0001, now + 2.35);
 
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
+      subOsc.connect(subFilter);
+      subFilter.connect(subGain);
+      subGain.connect(ctx.destination);
+
       noise.start(now);
-      noise.stop(now + 0.92);
+      noise.stop(now + 2.42);
+      subOsc.start(now);
+      subOsc.stop(now + 2.4);
       return;
     }
 
@@ -129,14 +149,35 @@ export function playSpaceSfx(kind: SpaceSfxKind, muted = false): void {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(92, now);
-      osc.frequency.exponentialRampToValueAtTime(38, now + 0.45);
-      gain.gain.setValueAtTime(0.14, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+      osc.frequency.setValueAtTime(88, now);
+      osc.frequency.exponentialRampToValueAtTime(32, now + 0.52);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.58);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(now);
-      osc.stop(now + 0.52);
+      osc.stop(now + 0.6);
+
+      // Hydraulic strut & valve relief hiss
+      const hLen = Math.floor(ctx.sampleRate * 0.7);
+      const hBuf = ctx.createBuffer(1, hLen, ctx.sampleRate);
+      const ch = hBuf.getChannelData(0);
+      for (let i = 0; i < hLen; i++) ch[i] = Math.random() * 2 - 1;
+      const hSrc = ctx.createBufferSource();
+      hSrc.buffer = hBuf;
+      const hFilter = ctx.createBiquadFilter();
+      hFilter.type = 'bandpass';
+      hFilter.frequency.setValueAtTime(1550, now + 0.08);
+      hFilter.Q.setValueAtTime(1.1, now + 0.08);
+      const hGain = ctx.createGain();
+      hGain.gain.setValueAtTime(0.0001, now + 0.08);
+      hGain.gain.linearRampToValueAtTime(0.048, now + 0.14);
+      hGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.72);
+      hSrc.connect(hFilter);
+      hFilter.connect(hGain);
+      hGain.connect(ctx.destination);
+      hSrc.start(now + 0.08);
+      hSrc.stop(now + 0.74);
       return;
     }
 

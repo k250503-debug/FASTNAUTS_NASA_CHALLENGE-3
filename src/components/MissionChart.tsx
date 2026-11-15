@@ -19,19 +19,20 @@ export default function MissionChart({ history }: MissionChartProps) {
     <div className="w-full h-48">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={history} margin={{ top: 6, right: 10, left: -20, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.16)" />
           <XAxis
             dataKey="day"
-            stroke="#64748B"
+            stroke="#94A3B8"
             fontSize={11}
             tickFormatter={(d) => `D${d}`}
           />
-          <YAxis stroke="#64748B" fontSize={11} domain={[0, 100]} />
+          <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 100]} />
           <Tooltip
             contentStyle={{
-              backgroundColor: '#0F1623',
-              borderColor: '#334155',
-              borderRadius: '8px',
+              backgroundColor: 'rgba(10, 19, 36, 0.78)',
+              backdropFilter: 'blur(12px)',
+              borderColor: 'rgba(125, 211, 252, 0.3)',
+              borderRadius: '10px',
               fontSize: '12px',
               color: '#F1F5F9',
             }}

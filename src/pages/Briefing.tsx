@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
+import PlanetaryBackdrop3D from '../three/PlanetaryBackdrop3D';
 import { ASTRONAUTS } from '../data/astronauts';
 import { getBuildingDef } from '../data/buildings';
 import { DIFFICULTIES, PLANETS } from '../data/planets';
@@ -57,39 +58,41 @@ export default function Briefing({
   }, {});
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#07090E] hud-grid">
+    <div className="relative min-h-screen flex flex-col text-slate-100">
+      <PlanetaryBackdrop3D planetId={planet.id} mode="orbit" />
+
       <Navbar
         showLandingNav={false}
         onGoHome={onGoHome}
         stepText="Step 3 of 3 · Mission Briefing"
       />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 space-y-6">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 space-y-6 relative z-10">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+          className="inline-flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Base Construction
         </button>
 
         {/* Operation Dossier */}
-        <section className="rounded-xl bg-space-900 border border-slate-800 p-6 sm:p-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6 mb-6">
+        <section className="rounded-2xl astra-glass p-6 sm:p-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6 mb-6">
             <div>
-              <div className="text-xs font-mono uppercase tracking-wider text-sky-400 mb-1">
+              <div className="text-xs font-mono uppercase tracking-wider text-cyan-400 mb-1">
                 {planet.missionCode}
               </div>
               <h1 className="font-display text-3xl sm:text-4xl font-bold text-white">
                 {planet.operationName} · {planet.name}
               </h1>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-sm text-slate-300 mt-1">
                 Commander:{' '}
                 <span className="text-white font-medium">
                   {config.playerName.trim() || 'Commander'}
                 </span>{' '}
-                · Gravity: <span className="text-sky-300 font-mono">{planet.gravityMs2} m/s²</span>{' '}
-                · Atmo: <span className="text-slate-200 font-mono">{planet.atmosphereKpa} kPa</span>{' '}
+                · Gravity: <span className="text-cyan-300 font-mono">{planet.gravityMs2} m/s²</span>{' '}
+                · Atmo: <span className="text-slate-100 font-mono">{planet.atmosphereKpa} kPa</span>{' '}
                 · Duration:{' '}
                 <span className="text-white font-mono tabular-nums">
                   {config.missionDays} Days
@@ -97,19 +100,19 @@ export default function Briefing({
               </p>
             </div>
 
-            <div className="px-4 py-3 rounded-lg bg-space-950 border border-slate-800 text-right shrink-0">
-              <div className="text-xs font-mono text-slate-400">
+            <div className="px-4 py-3 rounded-xl astra-glass-subtle text-right shrink-0">
+              <div className="text-xs font-mono text-slate-300">
                 {plannedBuildings.length} Modules Ready · Remaining Reserve
               </div>
               <div className="font-mono tabular-nums text-2xl font-bold text-emerald-400">
-                {reserve.toLocaleString()} <span className="text-xs text-slate-400">CR</span>
+                {reserve.toLocaleString()} <span className="text-xs text-slate-300">CR</span>
               </div>
             </div>
           </div>
 
           {plannedBuildings.length > 0 && (
-            <div className="mb-6 p-4 rounded-lg bg-space-950 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-xs font-mono uppercase tracking-wider text-sky-400">
+            <div className="mb-6 p-4 rounded-xl astra-glass-subtle flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs font-mono uppercase tracking-wider text-cyan-400">
                 Constructed Outpost Manifest
               </div>
               <div className="flex flex-wrap items-center gap-4 text-xs font-mono tabular-nums text-slate-200">
@@ -166,17 +169,17 @@ export default function Briefing({
         </section>
 
         {/* Crew Roster */}
-        <section className="rounded-xl bg-space-900 border border-slate-800 p-6 sm:p-8">
+        <section className="rounded-2xl astra-glass p-6 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
             <div>
-              <div className="text-xs font-mono uppercase tracking-wider text-sky-400 mb-1 flex items-center gap-1.5">
+              <div className="text-xs font-mono uppercase tracking-wider text-cyan-400 mb-1 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5" /> Crew Manifest (6 Specialists)
               </div>
               <h2 className="font-display text-2xl font-bold text-white">
                 Click Any Astronaut in 3D to Take Control
               </h2>
             </div>
-            <span className="text-xs font-mono text-slate-400">
+            <span className="text-xs font-mono text-slate-300">
               Move: WASD / Arrows · Jump: [Space] · Interact: [E] or Click
             </span>
           </div>
@@ -185,7 +188,7 @@ export default function Briefing({
             {ASTRONAUTS.map((astro) => (
               <div
                 key={astro.id}
-                className="p-4 rounded-lg bg-space-950 border border-slate-800 flex flex-col justify-between gap-2"
+                className="p-4 rounded-xl astra-glass-subtle flex flex-col justify-between gap-2"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-1">
@@ -198,14 +201,14 @@ export default function Briefing({
                         {astro.name}
                       </span>
                     </div>
-                    <span className="text-[11px] font-mono text-sky-400">
+                    <span className="text-[11px] font-mono text-cyan-300">
                       {astro.assignedWorldName.split('(')[0].trim()}
                     </span>
                   </div>
-                  <div className="text-xs font-semibold text-slate-200 mb-1">{astro.role}</div>
-                  <p className="text-xs text-slate-400 leading-relaxed">{astro.taskDescription}</p>
+                  <div className="text-xs font-semibold text-slate-100 mb-1">{astro.role}</div>
+                  <p className="text-xs text-slate-300 leading-relaxed">{astro.taskDescription}</p>
                 </div>
-                <div className="pt-2 border-t border-slate-800 text-[11px] text-emerald-400 font-mono">
+                <div className="pt-2 border-t border-white/10 text-[11px] text-emerald-400 font-mono">
                   Bonus: {astro.specialtyBonus}
                 </div>
               </div>
@@ -214,9 +217,9 @@ export default function Briefing({
         </section>
 
         {/* Pre-Flight Systems Reference */}
-        <section className="rounded-xl bg-space-900 border border-slate-800 p-6 sm:p-8">
+        <section className="rounded-2xl astra-glass p-6 sm:p-8">
           <div className="mb-5">
-            <div className="text-xs font-mono uppercase tracking-wider text-sky-400 mb-1">
+            <div className="text-xs font-mono uppercase tracking-wider text-cyan-400 mb-1">
               Pre-Flight Systems Reference
             </div>
             <h2 className="font-display text-2xl font-bold text-white">
@@ -235,11 +238,11 @@ export default function Briefing({
                   onClick={() => setActiveTab(sys.id)}
                   className={`px-4 py-2.5 rounded-lg border text-sm font-medium flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 ${
                     isActive
-                      ? 'bg-sky-500/15 border-sky-400 text-white'
-                      : 'bg-space-950 border-slate-800 text-slate-400 hover:text-white'
+                      ? 'bg-cyan-500/20 border-cyan-400 text-white'
+                      : 'astra-glass-subtle text-slate-300 hover:text-white hover:border-cyan-300/40'
                   }`}
                 >
-                  <Icon className="w-4 h-4 text-sky-400" />
+                  <Icon className="w-4 h-4 text-cyan-400" />
                   {sys.title}
                 </button>
               );
@@ -247,23 +250,23 @@ export default function Briefing({
           </div>
 
           {activeSystem && (
-            <div className="p-5 rounded-lg bg-space-950 border border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+            <div className="p-5 rounded-xl astra-glass-subtle grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               <div>
-                <div className="text-xs font-mono text-slate-400 mb-1">
+                <div className="text-xs font-mono text-slate-300 mb-1">
                   {activeSystem.unitLabel}
                 </div>
                 <h3 className="font-display text-xl font-bold text-white mb-2">
                   {activeSystem.title}
                 </h3>
-                <p className="text-sm text-slate-300 leading-relaxed">
+                <p className="text-sm text-slate-200 leading-relaxed">
                   {activeSystem.summary}
                 </p>
               </div>
-              <div className="p-4 rounded-lg bg-space-900 border border-slate-800">
-                <div className="text-xs font-mono text-sky-400 mb-1">
+              <div className="p-4 rounded-xl astra-glass-pill border border-white/15">
+                <div className="text-xs font-mono text-cyan-300 mb-1">
                   Engineering &amp; ISRU Insight
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
+                <p className="text-xs text-slate-200 leading-relaxed">
                   {activeSystem.scienceNote}
                 </p>
               </div>
@@ -274,7 +277,7 @@ export default function Briefing({
             <button
               type="button"
               onClick={onBack}
-              className="px-5 py-3 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-sm text-slate-300 font-medium flex items-center gap-2 transition-colors"
+              className="px-5 py-3 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-sm text-slate-200 font-medium flex items-center gap-2 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" /> Edit Base Modules
             </button>
@@ -282,7 +285,7 @@ export default function Briefing({
             <button
               type="button"
               onClick={onLaunchMission}
-              className="px-8 py-3.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-display font-bold flex items-center gap-2 transition-colors whitespace-nowrap shrink-0"
+              className="px-8 py-3.5 rounded-lg bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-display font-bold flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 shadow-[0_0_24px_rgba(52,211,153,0.3)]"
             >
               <Rocket className="w-5 h-5" />
               Launch Mission

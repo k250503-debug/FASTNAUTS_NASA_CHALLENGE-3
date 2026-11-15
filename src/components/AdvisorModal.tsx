@@ -146,18 +146,18 @@ export default function AdvisorModal({ state, preview, onClose }: AdvisorModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full rounded-xl bg-space-900 border border-slate-700 flex flex-col max-h-[85vh]">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 astra-glass-backdrop flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full rounded-xl astra-glass-modal flex flex-col max-h-[85vh]">
+        <div className="px-6 py-4 border-b border-white/15 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-sky-500/15 border border-sky-500/30 flex items-center justify-center">
-              <Bot className="w-5 h-5 text-sky-400" />
+            <div className="w-9 h-9 rounded-lg bg-cyan-500/15 border border-cyan-400/35 flex items-center justify-center">
+              <Bot className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
               <h2 className="font-display text-lg font-bold text-white">
                 AI Mission Advisor
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-300">
                 Telemetry-aware STEM guidance · Day {state.day} on {state.planetName}
               </p>
             </div>
@@ -166,7 +166,7 @@ export default function AdvisorModal({ state, preview, onClose }: AdvisorModalPr
             type="button"
             onClick={onClose}
             aria-label="Close Mission Advisor"
-            className="p-2 text-slate-400 hover:text-white rounded-lg"
+            className="p-2 text-slate-300 hover:text-white rounded-lg"
           >
             <X className="w-5 h-5" />
           </button>
@@ -174,7 +174,7 @@ export default function AdvisorModal({ state, preview, onClose }: AdvisorModalPr
 
         <div className="p-5 overflow-y-auto space-y-3 flex-1">
           {apiNotice && (
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-start gap-2">
+            <div className="p-3 rounded-lg astra-glass-warn text-xs text-amber-200 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{apiNotice}</span>
             </div>
@@ -185,12 +185,12 @@ export default function AdvisorModal({ state, preview, onClose }: AdvisorModalPr
               key={idx}
               className={`p-3.5 rounded-lg text-sm leading-relaxed ${
                 msg.role === 'user'
-                  ? 'bg-sky-500/15 border border-sky-500/30 text-white ml-8'
-                  : 'bg-space-950 border border-slate-800 text-slate-200 mr-8'
+                  ? 'bg-cyan-500/18 border border-cyan-400/40 text-white ml-8'
+                  : 'astra-glass-subtle text-slate-100 mr-8'
               }`}
             >
               {msg.role === 'advisor' && (
-                <div className="text-[11px] font-mono text-sky-400 mb-1 flex items-center gap-1.5">
+                <div className="text-[11px] font-mono text-cyan-300 mb-1 flex items-center gap-1.5">
                   <Cpu className="w-3.5 h-3.5" />
                   {msg.source === 'gemini' ? 'ASTRA Flight Director' : 'Telemetry Diagnostics'}
                 </div>
@@ -200,13 +200,13 @@ export default function AdvisorModal({ state, preview, onClose }: AdvisorModalPr
           ))}
 
           {loading && (
-            <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 text-xs font-mono text-slate-400 mr-8">
+            <div className="p-3.5 rounded-lg astra-glass-subtle text-xs font-mono text-slate-300 mr-8">
               Analyzing outpost telemetry...
             </div>
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-slate-800 bg-space-950/60">
+        <div className="px-5 py-3 border-t border-white/15 bg-slate-950/35 rounded-b-xl">
           <div className="flex flex-wrap gap-2 mb-3">
             {SUGGESTED_QUESTIONS.map((q) => (
               <button
@@ -214,7 +214,7 @@ export default function AdvisorModal({ state, preview, onClose }: AdvisorModalPr
                 type="button"
                 disabled={loading}
                 onClick={() => askQuestion(q)}
-                className="px-3 py-1.5 rounded-lg bg-space-800 hover:bg-space-700 border border-slate-700 text-xs text-slate-300 hover:text-white transition-colors"
+                className="px-3 py-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs text-slate-200 hover:text-white transition-colors"
               >
                 {q}
               </button>
@@ -233,12 +233,12 @@ export default function AdvisorModal({ state, preview, onClose }: AdvisorModalPr
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about water, power, ISRU, or upgrades..."
-              className="flex-1 px-4 py-2.5 rounded-lg bg-space-950 border border-slate-700 focus:border-sky-400 focus:outline-none text-sm text-white placeholder-slate-500"
+              className="flex-1 px-4 py-2.5 rounded-lg astra-glass-subtle focus:border-cyan-400 focus:outline-none text-sm text-white placeholder-slate-400"
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
-              className="px-4 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-semibold text-sm flex items-center gap-2 transition-colors whitespace-nowrap shrink-0"
+              className="px-4 py-2.5 rounded-lg bg-cyan-400 hover:bg-cyan-300 disabled:bg-slate-800/70 disabled:text-slate-500 text-slate-950 font-semibold text-sm flex items-center gap-2 transition-colors whitespace-nowrap shrink-0"
             >
               <Send className="w-4 h-4" />
               Ask

@@ -36,9 +36,9 @@ export default function TacticalMinimap({
   const roverPt = toMapCoord(positions.rover.x, positions.rover.z);
 
   return (
-    <div className="rounded-xl bg-[#0F1623]/94 border border-slate-800 p-2.5 w-[176px] select-none">
+    <div className="rounded-xl astra-glass p-2.5 w-[176px] select-none">
       <div className="flex items-center justify-between text-[10px] font-mono text-slate-300 mb-1.5">
-        <span className="text-sky-400 uppercase tracking-wider">Tactical Map</span>
+        <span className="text-cyan-300 uppercase tracking-wider">Tactical Map</span>
         <span>R={ROAMING_RADIUS}m</span>
       </div>
 
@@ -46,7 +46,7 @@ export default function TacticalMinimap({
         width={SIZE}
         height={SIZE}
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="rounded-lg bg-[#060A12] border border-slate-800 block"
+        className="rounded-lg bg-slate-950/55 border border-cyan-300/20 block"
       >
         {/* Roaming Boundary Ring */}
         <circle

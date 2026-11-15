@@ -1568,12 +1568,12 @@ export default function OutpostScene3D({
                 labelRefs.current[`astro-${astro.id}`] = el;
               }}
               style={{ opacity: 0 }}
-              className={`absolute top-0 left-0 px-2 py-0.5 rounded border text-[11px] font-mono whitespace-nowrap transition-colors ${
+              className={`absolute top-0 left-0 px-2 py-0.5 rounded-full astra-glass-pill text-[11px] font-mono whitespace-nowrap transition-colors ${
                 hasMed
-                  ? 'bg-rose-950/95 border-rose-400 text-rose-100 font-bold'
+                  ? 'border-rose-400/75 text-rose-100 font-bold'
                   : isActive
-                  ? 'bg-[#0F1623]/95 border-sky-400 text-white font-bold'
-                  : 'bg-[#07090E]/85 border-slate-700 text-slate-200'
+                  ? 'border-cyan-400/75 text-white font-bold'
+                  : 'border-white/20 text-slate-200'
               }`}
             >
               <span
@@ -1592,12 +1592,12 @@ export default function OutpostScene3D({
             labelRefs.current['storm-flue'] = el;
           }}
           style={{ opacity: 0 }}
-          className={`absolute top-0 left-0 px-2 py-0.5 rounded border text-[10px] font-mono whitespace-nowrap ${
+          className={`absolute top-0 left-0 px-2 py-0.5 rounded-full astra-glass-pill text-[10px] font-mono whitespace-nowrap ${
             state.stormFlue.status === 'critical'
-              ? 'bg-rose-950/95 border-rose-500 text-rose-200'
+              ? 'border-rose-400/75 text-rose-200'
               : state.stormFlue.status === 'warning'
-              ? 'bg-amber-950/95 border-amber-500 text-amber-200'
-              : 'bg-[#07090E]/90 border-slate-700 text-emerald-300'
+              ? 'border-amber-400/75 text-amber-200'
+              : 'border-white/20 text-emerald-300'
           }`}
         >
           Storm Flue · {state.stormFlue.cloggedPct}% Clog
@@ -1608,7 +1608,7 @@ export default function OutpostScene3D({
             labelRefs.current['nasa-spaceship'] = el;
           }}
           style={{ opacity: 0 }}
-          className="absolute top-0 left-0 px-2 py-0.5 rounded border border-emerald-500/60 bg-[#07090E]/90 text-[10px] font-mono text-emerald-300 whitespace-nowrap"
+          className="absolute top-0 left-0 px-2 py-0.5 rounded-full astra-glass-pill border-emerald-400/60 text-[10px] font-mono text-emerald-200 whitespace-nowrap"
         >
           NASA Starship · Fuel {state.fuel.shipTankPct}%
         </div>
@@ -1618,7 +1618,7 @@ export default function OutpostScene3D({
             labelRefs.current['planted-flag'] = el;
           }}
           style={{ opacity: 0 }}
-          className="absolute top-0 left-0 px-2 py-0.5 rounded border border-emerald-400/70 bg-emerald-950/90 text-[10px] font-mono text-emerald-200 whitespace-nowrap"
+          className="absolute top-0 left-0 px-2 py-0.5 rounded-full astra-glass-pill border-emerald-400/75 text-[10px] font-mono text-emerald-100 whitespace-nowrap"
         >
           ⚑ {activeFlag?.siteLabel || 'Expedition Flag'}
         </div>
@@ -1630,10 +1630,10 @@ export default function OutpostScene3D({
               labelRefs.current[`node-${node.id}`] = el;
             }}
             style={{ opacity: 0 }}
-            className={`absolute top-0 left-0 px-2 py-0.5 rounded border text-[10px] font-mono whitespace-nowrap ${
+            className={`absolute top-0 left-0 px-2 py-0.5 rounded-full astra-glass-pill text-[10px] font-mono whitespace-nowrap ${
               node.collected
-                ? 'bg-emerald-950/90 border-emerald-500/60 text-emerald-300'
-                : 'bg-[#0F1623]/90 border-sky-500/60 text-sky-300'
+                ? 'border-emerald-400/60 text-emerald-200'
+                : 'border-cyan-400/60 text-cyan-200'
             }`}
           >
             {node.collected ? '✓ ' : '◆ '}

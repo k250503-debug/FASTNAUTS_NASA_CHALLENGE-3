@@ -75,17 +75,17 @@ export default function AstronautGalleryModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 sm:p-5">
+    <div className="fixed inset-0 z-50 astra-glass-backdrop flex items-center justify-center p-3 sm:p-5">
       <motion.div
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-6xl h-[min(90vh,760px)] rounded-2xl bg-[#090D16] border border-slate-700 overflow-hidden flex flex-col shadow-2xl"
+        className="w-full max-w-6xl h-[min(90vh,760px)] rounded-2xl astra-glass-modal overflow-hidden flex flex-col shadow-2xl"
       >
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between gap-4 bg-[#07090E]">
+        <div className="px-5 py-3.5 border-b border-white/15 flex items-center justify-between gap-4 bg-slate-950/35">
           <div>
-            <div className="text-[11px] font-mono uppercase tracking-wider text-sky-400">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-cyan-300">
               3D Crew Selection &amp; Suit Engineering Studio
             </div>
             <h2 className="font-display text-lg sm:text-xl font-bold text-white">
@@ -96,7 +96,7 @@ export default function AstronautGalleryModal({
             type="button"
             onClick={onClose}
             aria-label="Close astronaut gallery"
-            className="p-2 rounded-lg bg-[#0F1623] border border-slate-700 hover:border-sky-400 text-slate-300 hover:text-white"
+            className="p-2 rounded-lg astra-glass-subtle hover:border-cyan-400 text-slate-200 hover:text-white"
           >
             <X className="w-4 h-4" />
           </button>
@@ -104,7 +104,7 @@ export default function AstronautGalleryModal({
 
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12">
           {/* Left: Character Selection Cards */}
-          <div className="lg:col-span-3 border-b lg:border-b-0 lg:border-r border-slate-800 p-3 overflow-y-auto bg-[#07090E]/70 flex lg:flex-col gap-2">
+          <div className="lg:col-span-3 border-b lg:border-b-0 lg:border-r border-white/15 p-3 overflow-y-auto bg-slate-950/25 flex lg:flex-col gap-2">
             {ASTRONAUTS.map((astro) => {
               const selected = inspectId === astro.id;
               const isActive = activeAstronautId === astro.id;
@@ -118,8 +118,8 @@ export default function AstronautGalleryModal({
                   }}
                   className={`min-w-[190px] lg:min-w-0 w-full p-3 rounded-xl border text-left transition-colors shrink-0 ${
                     selected
-                      ? 'bg-sky-500/15 border-sky-400 text-white'
-                      : 'bg-[#0F1623]/80 border-slate-800 text-slate-300 hover:border-slate-600'
+                      ? 'bg-cyan-500/20 border-cyan-400 text-white'
+                      : 'astra-glass-subtle text-slate-200 hover:border-cyan-400/50'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
@@ -136,8 +136,8 @@ export default function AstronautGalleryModal({
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-sky-300 truncate">{astro.role}</div>
-                  <div className="text-[10px] font-mono text-slate-400 truncate mt-0.5">
+                  <div className="text-[11px] text-cyan-300 truncate">{astro.role}</div>
+                  <div className="text-[10px] font-mono text-slate-300 truncate mt-0.5">
                     {astro.assignedWorldName}
                   </div>
                 </button>
@@ -146,7 +146,7 @@ export default function AstronautGalleryModal({
           </div>
 
           {/* Center: Interactive 360-deg 3D Astronaut Model */}
-          <div className="lg:col-span-5 relative min-h-[280px] bg-[#07090E] border-b lg:border-b-0 lg:border-r border-slate-800">
+          <div className="lg:col-span-5 relative min-h-[280px] bg-slate-950/35 border-b lg:border-b-0 lg:border-r border-white/15">
             <AstronautPreview3D
               astronautId={inspectId}
               customization={custom}
@@ -154,7 +154,7 @@ export default function AstronautGalleryModal({
             />
 
             <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
-              <div className="pointer-events-auto flex items-center gap-1 bg-[#07090E]/90 border border-slate-800 rounded-lg p-1">
+              <div className="pointer-events-auto flex items-center gap-1 astra-glass-pill border border-white/15 rounded-lg p-1">
                 {(
                   [
                     { id: 'full', label: 'Full Suit' },
@@ -171,8 +171,8 @@ export default function AstronautGalleryModal({
                     }}
                     className={`px-2.5 py-1 rounded text-[10px] font-mono transition-colors ${
                       focus === f.id
-                        ? 'bg-sky-500 text-slate-950 font-bold'
-                        : 'text-slate-300 hover:text-white'
+                        ? 'bg-cyan-400 text-slate-950 font-bold'
+                        : 'text-slate-200 hover:text-white'
                     }`}
                   >
                     {f.label}
@@ -181,30 +181,30 @@ export default function AstronautGalleryModal({
               </div>
             </div>
 
-            <div className="pointer-events-none absolute bottom-3 inset-x-3 flex items-center justify-between text-[11px] font-mono text-slate-400 bg-[#07090E]/85 border border-slate-800 rounded-lg px-3 py-1.5">
+            <div className="pointer-events-none absolute bottom-3 inset-x-3 flex items-center justify-between text-[11px] font-mono text-slate-300 astra-glass-pill border border-white/15 rounded-lg px-3 py-1.5">
               <span>Drag: 360° Rotate · Scroll/Pinch: Zoom</span>
-              <span className="text-sky-300 truncate ml-2">{profile.name}</span>
+              <span className="text-cyan-300 truncate ml-2">{profile.name}</span>
             </div>
           </div>
 
           {/* Right: Specs & Real-Time 3D Customization */}
-          <div className="lg:col-span-4 p-4 sm:p-5 overflow-y-auto flex flex-col justify-between gap-4 bg-[#0B111C]">
+          <div className="lg:col-span-4 p-4 sm:p-5 overflow-y-auto flex flex-col justify-between gap-4 bg-slate-950/20">
             <div className="space-y-4">
               <div>
-                <div className="text-[11px] font-mono text-sky-400">{profile.role}</div>
+                <div className="text-[11px] font-mono text-cyan-300">{profile.role}</div>
                 <h3 className="font-display text-2xl font-bold text-white">{profile.name}</h3>
-                <p className="text-xs text-slate-300 leading-relaxed mt-1.5">
+                <p className="text-xs text-slate-200 leading-relaxed mt-1.5">
                   {profile.taskDescription}
                 </p>
-                <div className="mt-2 px-3 py-2 rounded-lg bg-[#07090E] border border-slate-800 text-[11px] text-emerald-300">
+                <div className="mt-2 px-3 py-2 rounded-lg astra-glass-subtle text-[11px] text-emerald-300">
                   Specialty: {profile.specialtyBonus}
                 </div>
               </div>
 
               {/* Suit Design Selector */}
               <div>
-                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-sky-400" />
+                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-cyan-400" />
                   Suit Architecture
                 </div>
                 <div className="grid grid-cols-3 gap-1.5">
@@ -215,8 +215,8 @@ export default function AstronautGalleryModal({
                       onClick={() => patchCustom({ suitDesign: sd.id })}
                       className={`p-2 rounded-lg border text-left transition-colors ${
                         custom.suitDesign === sd.id
-                          ? 'bg-sky-500/20 border-sky-400 text-white'
-                          : 'bg-[#07090E] border-slate-800 text-slate-300 hover:border-slate-600'
+                          ? 'bg-cyan-500/20 border-cyan-400 text-white'
+                          : 'astra-glass-subtle text-slate-200 hover:border-cyan-400/50'
                       }`}
                     >
                       <div className="text-[11px] font-semibold">{sd.label}</div>
@@ -227,7 +227,7 @@ export default function AstronautGalleryModal({
 
               {/* Helmet Customization */}
               <div>
-                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1.5">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-300 mb-1.5 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                   Helmet Visor Assembly
                 </div>
@@ -242,8 +242,8 @@ export default function AstronautGalleryModal({
                       }}
                       className={`p-2 rounded-lg border text-center text-[11px] font-medium transition-colors ${
                         custom.helmetStyle === hs.id
-                          ? 'bg-sky-500/20 border-sky-400 text-white'
-                          : 'bg-[#07090E] border-slate-800 text-slate-300 hover:border-slate-600'
+                          ? 'bg-cyan-500/20 border-cyan-400 text-white'
+                          : 'astra-glass-subtle text-slate-200 hover:border-cyan-400/50'
                       }`}
                     >
                       {hs.label}
@@ -254,7 +254,7 @@ export default function AstronautGalleryModal({
 
               {/* Backpack & Equipment Pack */}
               <div>
-                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1.5">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-300 mb-1.5">
                   PLSS Backpack &amp; Rig
                 </div>
                 <div className="grid grid-cols-3 gap-1.5">
@@ -268,8 +268,8 @@ export default function AstronautGalleryModal({
                       }}
                       className={`p-2 rounded-lg border text-center text-[11px] font-medium transition-colors ${
                         custom.backpackStyle === bp.id
-                          ? 'bg-sky-500/20 border-sky-400 text-white'
-                          : 'bg-[#07090E] border-slate-800 text-slate-300 hover:border-slate-600'
+                          ? 'bg-cyan-500/20 border-cyan-400 text-white'
+                          : 'astra-glass-subtle text-slate-200 hover:border-cyan-400/50'
                       }`}
                     >
                       {bp.label}
@@ -281,7 +281,7 @@ export default function AstronautGalleryModal({
               {/* Colors */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-slate-300 mb-1.5 flex items-center gap-1">
                     <Palette className="w-3 h-3 text-cyan-400" /> Suit Finish
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -293,8 +293,8 @@ export default function AstronautGalleryModal({
                         onClick={() => patchCustom({ primaryColorHex: c.hex })}
                         className={`w-7 h-7 rounded-lg border-2 transition-transform ${
                           custom.primaryColorHex === c.hex
-                            ? 'border-sky-400 scale-110'
-                            : 'border-slate-700 hover:scale-105'
+                            ? 'border-cyan-400 scale-110'
+                            : 'border-white/25 hover:scale-105'
                         }`}
                         style={{ backgroundColor: c.css }}
                       />
@@ -303,7 +303,7 @@ export default function AstronautGalleryModal({
                 </div>
 
                 <div>
-                  <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1.5">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-slate-300 mb-1.5">
                     Trim Accent
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -316,7 +316,7 @@ export default function AstronautGalleryModal({
                         className={`w-7 h-7 rounded-lg border-2 transition-transform ${
                           custom.accentColorHex === c.hex
                             ? 'border-white scale-110'
-                            : 'border-slate-700 hover:scale-105'
+                            : 'border-white/25 hover:scale-105'
                         }`}
                         style={{ backgroundColor: c.css }}
                       />
@@ -326,7 +326,7 @@ export default function AstronautGalleryModal({
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-800">
+            <div className="pt-3 border-t border-white/15">
               <button
                 type="button"
                 onClick={() => {
@@ -334,7 +334,7 @@ export default function AstronautGalleryModal({
                   onSelectAstronaut(inspectId);
                   onClose();
                 }}
-                className="w-full py-3 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-display font-bold text-sm flex items-center justify-center gap-2 transition-colors"
+                className="w-full py-3 px-4 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-display font-bold text-sm flex items-center justify-center gap-2 transition-colors"
               >
                 {activeAstronautId === inspectId ? (
                   <>

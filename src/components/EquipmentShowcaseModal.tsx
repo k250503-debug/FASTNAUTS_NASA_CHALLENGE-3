@@ -48,7 +48,7 @@ export function EquipmentSideDock({
       <motion.div
         animate={{ width: collapsed ? 46 : 246 }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="rounded-xl bg-[#0B111C]/95 border border-slate-800 shadow-2xl overflow-hidden flex flex-col"
+        className="rounded-xl astra-glass shadow-2xl overflow-hidden flex flex-col"
       >
         <button
           type="button"
@@ -57,7 +57,7 @@ export function EquipmentSideDock({
             setCollapsed((c) => !c);
           }}
           title={collapsed ? 'Expand Equipment Showcase Side Rail' : 'Collapse Equipment Rail'}
-          className="w-full px-3 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs font-mono text-cyan-300 hover:bg-slate-800/70 transition-colors"
+          className="w-full px-3 py-2.5 border-b border-white/15 flex items-center justify-between text-xs font-mono text-cyan-300 hover:bg-white/10 transition-colors"
         >
           {!collapsed && <span className="truncate font-semibold">3D Equipment</span>}
           {collapsed ? (
@@ -83,7 +83,7 @@ export function EquipmentSideDock({
                   );
                   onInspectEquipment(item.id);
                 }}
-                className="w-full px-2 py-2 rounded-lg bg-[#07090E]/90 hover:bg-sky-500/15 border border-slate-800 hover:border-sky-400/60 text-left flex items-center gap-2.5 transition-colors group"
+                className="w-full px-2 py-2 rounded-lg astra-glass-subtle hover:bg-cyan-500/15 hover:border-cyan-400/60 text-left flex items-center gap-2.5 transition-colors group"
               >
                 <Icon className="w-4 h-4 text-cyan-400 shrink-0 group-hover:scale-110 transition-transform" />
                 {!collapsed && (
@@ -143,17 +143,17 @@ export default function EquipmentShowcaseModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 sm:p-5">
+    <div className="fixed inset-0 z-50 astra-glass-backdrop flex items-center justify-center p-3 sm:p-5">
       <motion.div
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-6xl h-[min(90vh,760px)] rounded-2xl bg-[#090D16] border border-slate-700 overflow-hidden flex flex-col shadow-2xl"
+        className="w-full max-w-6xl h-[min(90vh,760px)] rounded-2xl astra-glass-modal overflow-hidden flex flex-col shadow-2xl"
       >
         {/* Top Bar */}
-        <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between gap-4 bg-[#07090E]">
+        <div className="px-5 py-3.5 border-b border-white/15 flex items-center justify-between gap-4 bg-slate-950/35">
           <div>
-            <div className="text-[11px] font-mono uppercase tracking-wider text-cyan-400">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-cyan-300">
               Interactive 3D Systems &amp; Hardware Inspection
             </div>
             <h2 className="font-display text-lg sm:text-xl font-bold text-white">
@@ -164,7 +164,7 @@ export default function EquipmentShowcaseModal({
             type="button"
             onClick={onClose}
             aria-label="Close equipment showcase"
-            className="p-2 rounded-lg bg-[#0F1623] border border-slate-700 hover:border-sky-400 text-slate-300 hover:text-white transition-colors"
+            className="p-2 rounded-lg astra-glass-subtle hover:border-cyan-400 text-slate-200 hover:text-white transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -173,7 +173,7 @@ export default function EquipmentShowcaseModal({
         {/* Main 3-Column Studio Body */}
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12">
           {/* Left Equipment Category List */}
-          <div className="lg:col-span-3 border-b lg:border-b-0 lg:border-r border-slate-800 p-3 overflow-y-auto bg-[#07090E]/70 flex lg:flex-col gap-1.5">
+          <div className="lg:col-span-3 border-b lg:border-b-0 lg:border-r border-white/15 p-3 overflow-y-auto bg-slate-950/25 flex lg:flex-col gap-1.5">
             {EQUIPMENT_CATALOG.map((item) => {
               const Icon = EQUIP_ICONS[item.id];
               const active = selectedId === item.id;
@@ -185,18 +185,18 @@ export default function EquipmentShowcaseModal({
                   onClick={() => handleSelectEquipment(item.id)}
                   className={`min-w-[200px] lg:min-w-0 w-full p-2.5 rounded-xl border text-left transition-colors flex items-start gap-2.5 shrink-0 ${
                     active
-                      ? 'bg-sky-500/15 border-sky-400 text-white'
-                      : 'bg-[#0F1623]/80 border-slate-800 text-slate-300 hover:border-slate-600'
+                      ? 'bg-cyan-500/20 border-cyan-400 text-white'
+                      : 'astra-glass-subtle text-slate-200 hover:border-cyan-400/50'
                   }`}
                 >
                   <Icon
                     className={`w-4 h-4 mt-0.5 shrink-0 ${
-                      active ? 'text-cyan-300' : 'text-slate-400'
+                      active ? 'text-cyan-300' : 'text-slate-300'
                     }`}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-semibold truncate">{item.name}</div>
-                    <div className="text-[10px] font-mono text-slate-400 flex items-center justify-between gap-2 mt-0.5">
+                    <div className="text-[10px] font-mono text-slate-300 flex items-center justify-between gap-2 mt-0.5">
                       <span className="truncate">{item.category}</span>
                       {owned && <span className="text-emerald-400 shrink-0">Ready</span>}
                     </div>
@@ -207,7 +207,7 @@ export default function EquipmentShowcaseModal({
           </div>
 
           {/* Center Interactive 3D Viewport */}
-          <div className="lg:col-span-5 relative min-h-[280px] bg-[#07090E] border-b lg:border-b-0 lg:border-r border-slate-800">
+          <div className="lg:col-span-5 relative min-h-[280px] bg-slate-950/35 border-b lg:border-b-0 lg:border-r border-white/15">
             <EquipmentShowcase3D
               equipmentId={selectedId}
               cameraAngle={angle}
@@ -216,7 +216,7 @@ export default function EquipmentShowcaseModal({
 
             {/* Viewport Camera Angle Controls */}
             <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-              <div className="pointer-events-auto flex items-center gap-1 bg-[#07090E]/90 border border-slate-800 rounded-lg p-1">
+              <div className="pointer-events-auto flex items-center gap-1 astra-glass-pill border border-white/15 rounded-lg p-1">
                 {(
                   [
                     { id: 'iso', label: '3/4 Orbit' },
@@ -234,8 +234,8 @@ export default function EquipmentShowcaseModal({
                     }}
                     className={`px-2 py-1 rounded text-[10px] font-mono transition-colors ${
                       angle === preset.id
-                        ? 'bg-sky-500 text-slate-950 font-bold'
-                        : 'text-slate-300 hover:text-white'
+                        ? 'bg-cyan-400 text-slate-950 font-bold'
+                        : 'text-slate-200 hover:text-white'
                     }`}
                   >
                     {preset.label}
@@ -252,50 +252,50 @@ export default function EquipmentShowcaseModal({
                   );
                   setReplayTrigger((v) => v + 1);
                 }}
-                className="pointer-events-auto px-2.5 py-1 rounded-lg bg-[#07090E]/90 border border-slate-700 hover:border-cyan-400 text-[10px] font-mono text-cyan-300 flex items-center gap-1"
+                className="pointer-events-auto px-2.5 py-1 rounded-lg astra-glass-pill border border-white/20 hover:border-cyan-400 text-[10px] font-mono text-cyan-300 flex items-center gap-1"
               >
                 <RotateCcw className="w-3 h-3" />
                 Replay Demo
               </button>
             </div>
 
-            <div className="pointer-events-none absolute bottom-3 inset-x-3 flex items-center justify-between text-[11px] font-mono text-slate-400 bg-[#07090E]/85 border border-slate-800 rounded-lg px-3 py-1.5">
+            <div className="pointer-events-none absolute bottom-3 inset-x-3 flex items-center justify-between text-[11px] font-mono text-slate-300 astra-glass-pill border border-white/15 rounded-lg px-3 py-1.5">
               <span>Drag: Rotate 360° · Scroll/Pinch: Zoom</span>
               <span className="text-cyan-300 truncate ml-2">{selected.animationLabel}</span>
             </div>
           </div>
 
           {/* Right Inspection Details & Add-to-Inventory */}
-          <div className="lg:col-span-4 p-4 sm:p-5 overflow-y-auto flex flex-col justify-between gap-4 bg-[#0B111C]">
+          <div className="lg:col-span-4 p-4 sm:p-5 overflow-y-auto flex flex-col justify-between gap-4 bg-slate-950/20">
             <div className="space-y-4">
               <div>
-                <div className="text-[11px] font-mono text-cyan-400 mb-1">{selected.category}</div>
+                <div className="text-[11px] font-mono text-cyan-300 mb-1">{selected.category}</div>
                 <h3 className="font-display text-2xl font-bold text-white leading-tight">
                   {selected.name}
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mt-2">
+                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed mt-2">
                   {selected.description}
                 </p>
               </div>
 
               <div>
-                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-300 mb-1">
                   Operational Purpose
                 </div>
-                <p className="text-xs text-slate-200 leading-relaxed bg-[#07090E] border border-slate-800 rounded-lg p-3">
+                <p className="text-xs text-slate-100 leading-relaxed astra-glass-subtle rounded-lg p-3">
                   {selected.purpose}
                 </p>
               </div>
 
               <div>
-                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1.5">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-slate-300 mb-1.5">
                   System Cycle &amp; Functionality
                 </div>
-                <ol className="space-y-1.5 text-xs text-slate-300">
+                <ol className="space-y-1.5 text-xs text-slate-200">
                   {selected.functionalitySteps.map((step, idx) => (
                     <li
                       key={step}
-                      className="flex items-start gap-2 bg-[#07090E]/80 border border-slate-800/80 rounded-lg px-2.5 py-2"
+                      className="flex items-start gap-2 astra-glass-subtle rounded-lg px-2.5 py-2"
                     >
                       <span className="font-mono text-cyan-400 font-bold shrink-0">
                         0{idx + 1}.
@@ -310,9 +310,9 @@ export default function EquipmentShowcaseModal({
                 {selected.specs.map((spec) => (
                   <div
                     key={spec.label}
-                    className="bg-[#07090E] border border-slate-800 rounded-lg px-2.5 py-2"
+                    className="astra-glass-subtle rounded-lg px-2.5 py-2"
                   >
-                    <div className="text-[10px] font-mono text-slate-400">{spec.label}</div>
+                    <div className="text-[10px] font-mono text-slate-300">{spec.label}</div>
                     <div className="text-xs font-mono font-bold text-white tabular-nums">
                       {spec.value}
                     </div>
@@ -321,7 +321,7 @@ export default function EquipmentShowcaseModal({
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-800 space-y-2">
+            <div className="pt-3 border-t border-white/15 space-y-2">
               <div className="text-[11px] text-emerald-300 font-mono">
                 Field Impact: {selected.inventoryEffectDesc}
               </div>

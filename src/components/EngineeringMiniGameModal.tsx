@@ -59,18 +59,18 @@ export default function EngineeringMiniGameModal({
     (kind === 'fuel_transfer' && fuelReady);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
-      <div className="max-w-lg w-full rounded-xl bg-space-900 border border-sky-500/50 p-6 relative shadow-2xl">
+    <div className="fixed inset-0 z-50 astra-glass-backdrop flex items-center justify-center p-4">
+      <div className="max-w-lg w-full rounded-xl astra-glass-modal border-cyan-400/45 p-6 relative shadow-2xl">
         <button
           type="button"
           onClick={onClose}
           aria-label="Close calibration"
-          className="absolute top-4 right-4 text-slate-400 hover:text-white"
+          className="absolute top-4 right-4 text-slate-300 hover:text-white"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-sky-400 mb-1">
+        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-cyan-300 mb-1">
           {kind === 'circuit_patch' && <Cpu className="w-4 h-4" />}
           {kind === 'antenna_align' && <Radio className="w-4 h-4" />}
           {kind === 'thermal_valve' && <Flame className="w-4 h-4" />}
@@ -81,7 +81,7 @@ export default function EngineeringMiniGameModal({
 
         {kind === 'circuit_patch' && (
           <div className="space-y-4">
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-slate-200">
               Click each bus relay below to cycle voltage until all 4 avionics channels match the
               required NASA target polarity.
             </p>
@@ -98,8 +98,8 @@ export default function EngineeringMiniGameModal({
                     }
                     className={`p-3 rounded-lg border text-center transition-colors ${
                       matched
-                        ? 'bg-emerald-950/50 border-emerald-400 text-emerald-200'
-                        : 'bg-space-950 border-slate-700 hover:border-sky-400 text-slate-200'
+                        ? 'astra-glass-success text-emerald-200'
+                        : 'astra-glass-subtle hover:border-cyan-400 text-slate-200'
                     }`}
                   >
                     <div className="text-[10px] font-mono text-slate-400 mb-1">CH-{idx + 1}</div>
@@ -121,7 +121,7 @@ export default function EngineeringMiniGameModal({
               strength reaches <span className="text-emerald-400 font-mono">≥ 92%</span>.
             </p>
 
-            <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 space-y-3">
+            <div className="p-3.5 rounded-lg astra-glass-subtle space-y-3">
               <div>
                 <div className="flex justify-between text-xs font-mono mb-1">
                   <span className="text-slate-400">Dish Azimuth (Target ~148°)</span>
@@ -173,7 +173,7 @@ export default function EngineeringMiniGameModal({
               <span className="font-mono text-sky-300">28–40%</span> load and total flow equals{' '}
               <span className="font-mono text-emerald-300">100%</span>.
             </p>
-            <div className="space-y-3 p-3.5 rounded-lg bg-space-950 border border-slate-800">
+            <div className="space-y-3 p-3.5 rounded-lg astra-glass-subtle">
               {valves.map((v, i) => (
                 <div key={i}>
                   <div className="flex justify-between text-xs font-mono mb-1">
@@ -224,7 +224,7 @@ export default function EngineeringMiniGameModal({
               <span className="font-mono text-emerald-300">220–260 bar</span> before opening the
               Starship cryogenic umbilical.
             </p>
-            <div className="space-y-3 p-3.5 rounded-lg bg-space-950 border border-slate-800">
+            <div className="space-y-3 p-3.5 rounded-lg astra-glass-subtle">
               <div>
                 <div className="flex justify-between text-xs font-mono mb-1">
                   <span className="text-slate-400">LOX : CH₄ Mixture Ratio</span>
@@ -291,7 +291,7 @@ export default function EngineeringMiniGameModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-2 rounded-lg bg-[#07090E] border border-slate-700 text-xs text-slate-300 hover:text-white"
+              className="px-3.5 py-2 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs text-slate-200 hover:text-white"
             >
               Cancel
             </button>

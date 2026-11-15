@@ -452,23 +452,23 @@ export default function MissionControl({
       )}
 
       {/* Top Header: 6 Core Status Indicators + Mission Controls */}
-      <header className="absolute top-0 inset-x-0 z-20 bg-[#0F1623]/94 border-b border-slate-800 px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2">
+      <header className="absolute top-0 inset-x-0 z-20 astra-glass-dock border-b px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-1.5 shrink-0">
-            <Rocket className="w-4 h-4 text-sky-400" />
+            <Rocket className="w-4 h-4 text-cyan-400" />
             <span className="font-display font-bold text-white tracking-wider text-sm">
               ASTRA
             </span>
           </div>
 
-          <div className="flex items-center gap-1 bg-[#07090E] border border-slate-800 rounded-lg p-0.5">
+          <div className="flex items-center gap-1 astra-glass-subtle rounded-lg p-0.5">
             <button
               type="button"
               onClick={() => setSceneMode('outpost')}
               className={`px-2 py-1 rounded text-[11px] font-mono transition-colors whitespace-nowrap shrink-0 ${
                 sceneMode === 'outpost'
-                  ? 'bg-sky-500 text-slate-950 font-bold'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-cyan-400 text-slate-950 font-bold'
+                  : 'text-slate-300 hover:text-white'
               }`}
             >
               Outpost
@@ -478,8 +478,8 @@ export default function MissionControl({
               onClick={() => setSceneMode('astronaut')}
               className={`px-2 py-1 rounded text-[11px] font-mono transition-colors flex items-center gap-1 whitespace-nowrap shrink-0 ${
                 sceneMode === 'astronaut'
-                  ? 'bg-sky-500 text-slate-950 font-bold'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-cyan-400 text-slate-950 font-bold'
+                  : 'text-slate-300 hover:text-white'
               }`}
             >
               <User className="w-3 h-3" />
@@ -487,8 +487,8 @@ export default function MissionControl({
             </button>
           </div>
 
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono text-sky-300 whitespace-nowrap">
-            <Globe className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono text-cyan-300 whitespace-nowrap">
+            <Globe className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             {planet.name} · {planet.gravityMs2} m/s²
           </span>
         </div>
@@ -498,7 +498,7 @@ export default function MissionControl({
           <button
             type="button"
             onClick={() => setSelectedResource('oxygen')}
-            className={`px-2 py-1 rounded bg-[#07090E] border flex items-center gap-1 ${toneClass(
+            className={`px-2 py-1 rounded astra-glass-pill border flex items-center gap-1 hover:border-cyan-400/60 transition-colors ${toneClass(
               state.resources.oxygen.current
             )}`}
           >
@@ -507,7 +507,7 @@ export default function MissionControl({
           <button
             type="button"
             onClick={() => setSelectedResource('water')}
-            className={`px-2 py-1 rounded bg-[#07090E] border flex items-center gap-1 ${toneClass(
+            className={`px-2 py-1 rounded astra-glass-pill border flex items-center gap-1 hover:border-cyan-400/60 transition-colors ${toneClass(
               state.resources.water.current
             )}`}
           >
@@ -516,7 +516,7 @@ export default function MissionControl({
           <button
             type="button"
             onClick={() => setSelectedResource('food')}
-            className={`px-2 py-1 rounded bg-[#07090E] border flex items-center gap-1 ${toneClass(
+            className={`px-2 py-1 rounded astra-glass-pill border flex items-center gap-1 hover:border-cyan-400/60 transition-colors ${toneClass(
               state.resources.food.current
             )}`}
           >
@@ -525,7 +525,7 @@ export default function MissionControl({
           <button
             type="button"
             onClick={() => setSelectedResource('power')}
-            className={`px-2 py-1 rounded bg-[#07090E] border flex items-center gap-1 ${toneClass(
+            className={`px-2 py-1 rounded astra-glass-pill border flex items-center gap-1 hover:border-cyan-400/60 transition-colors ${toneClass(
               powerPct,
               35,
               15
@@ -537,12 +537,12 @@ export default function MissionControl({
             type="button"
             onClick={() => setSelectedResource('radiation')}
             title="Inspect Radiation Safety & Shielding"
-            className={`px-2 py-1 rounded bg-[#07090E] border flex items-center gap-1 ${
+            className={`px-2 py-1 rounded astra-glass-pill border flex items-center gap-1 hover:border-cyan-400/60 transition-colors ${
               state.crew.radiationExposure >= 65
                 ? 'border-rose-500/70 text-rose-300'
                 : state.crew.radiationExposure >= 40
                 ? 'border-amber-500/70 text-amber-300'
-                : 'border-slate-700 text-sky-300'
+                : 'border-cyan-300/25 text-cyan-200'
             }`}
           >
             <Shield className="w-3 h-3" /> Shield {Math.round(state.resources.shielding)}%
@@ -551,10 +551,10 @@ export default function MissionControl({
             type="button"
             onClick={() => setOpsModal('medical')}
             title="Open Crew Health & Biometrics"
-            className={`px-2 py-1 rounded bg-[#07090E] border flex items-center gap-1 ${
+            className={`px-2 py-1 rounded astra-glass-pill border flex items-center gap-1 hover:border-cyan-400/60 transition-colors ${
               medicalAlertsCount > 0 || state.crew.safe < state.crew.total
                 ? 'border-rose-500/70 text-rose-300'
-                : 'border-slate-700 text-emerald-300'
+                : 'border-emerald-400/35 text-emerald-300'
             }`}
           >
             <Users className="w-3 h-3" /> Crew {state.crew.safe}/{state.crew.total}
@@ -563,11 +563,11 @@ export default function MissionControl({
 
         {/* Day & Audio / Pause / Exit */}
         <div className="flex items-center gap-1.5 text-xs font-mono tabular-nums shrink-0">
-          <span className="px-2.5 py-1 rounded bg-[#07090E] border border-slate-700 text-white">
+          <span className="px-2.5 py-1 rounded astra-glass-pill border border-cyan-300/25 text-white">
             Day {String(state.day).padStart(2, '0')}/{state.maxDays}
           </span>
           {state.lunarState.eclipseActive && (
-            <span className="px-2 py-1 rounded bg-amber-950 border border-amber-400 text-amber-200 text-[10px]">
+            <span className="px-2 py-1 rounded astra-glass-warn text-amber-200 text-[10px]">
               ECLIPSE
             </span>
           )}
@@ -575,19 +575,19 @@ export default function MissionControl({
             type="button"
             onClick={onToggleAudio}
             aria-label={isAudioMuted ? 'Unmute Audio' : 'Mute Audio'}
-            className="p-1.5 rounded bg-[#07090E] border border-slate-700 hover:border-sky-400 text-slate-300"
+            className="p-1.5 rounded astra-glass-pill border border-white/15 hover:border-cyan-400 text-slate-200"
           >
             {isAudioMuted ? (
-              <VolumeX className="w-3.5 h-3.5 text-slate-500" />
+              <VolumeX className="w-3.5 h-3.5 text-slate-400" />
             ) : (
-              <Volume2 className="w-3.5 h-3.5 text-sky-400" />
+              <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
             )}
           </button>
           <button
             type="button"
             onClick={() => setPaused((p) => !p)}
             aria-label={paused ? 'Resume Simulation' : 'Pause Simulation'}
-            className="p-1.5 rounded bg-[#07090E] border border-slate-700 hover:border-sky-400 text-slate-300"
+            className="p-1.5 rounded astra-glass-pill border border-white/15 hover:border-cyan-400 text-slate-200"
           >
             {paused ? (
               <Play className="w-3.5 h-3.5 text-emerald-400" />
@@ -599,7 +599,7 @@ export default function MissionControl({
             type="button"
             onClick={onExitMission}
             aria-label="Exit Mission"
-            className="p-1.5 rounded bg-[#07090E] border border-slate-700 hover:border-rose-400 text-slate-300 hover:text-rose-400"
+            className="p-1.5 rounded astra-glass-pill border border-white/15 hover:border-rose-400 text-slate-200 hover:text-rose-400"
           >
             <LogOut className="w-3.5 h-3.5" />
           </button>
@@ -609,14 +609,14 @@ export default function MissionControl({
       {/* Alerts / Boundary / Refuge / Capcom Strip */}
       <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5 w-[min(92vw,700px)] pointer-events-none">
         {nearBoundary && (
-          <div className="px-3 py-1 rounded-lg bg-amber-950/95 border border-amber-400 text-xs font-mono text-amber-200 flex items-center gap-1.5">
+          <div className="px-3 py-1 rounded-lg astra-glass-warn text-xs font-mono text-amber-200 flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
             Outpost Roaming Perimeter (R={ROAMING_RADIUS}m) Reached — Clamped Safely
           </div>
         )}
 
         {state.shelterRefugeActive && (
-          <div className="pointer-events-auto w-full rounded-xl bg-amber-950/95 border border-amber-500 px-3.5 py-2 flex items-center justify-between gap-2 text-xs">
+          <div className="pointer-events-auto w-full rounded-xl astra-glass-warn px-3.5 py-2 flex items-center justify-between gap-2 text-xs">
             <span className="text-amber-100 flex items-center gap-2">
               <Shield className="w-4 h-4 text-amber-400 shrink-0" />
               <strong>Emergency Shelter Refuge Active:</strong> Crew protected inside Habitat &amp;
@@ -633,7 +633,7 @@ export default function MissionControl({
         )}
 
         {state.activeEvent ? (
-          <div className="pointer-events-auto w-full rounded-xl bg-rose-950/95 border border-rose-500 px-3.5 py-2.5 flex items-center justify-between gap-3 shadow-xl">
+          <div className="pointer-events-auto w-full rounded-xl astra-glass-alert px-3.5 py-2.5 flex items-center justify-between gap-3 shadow-xl">
             <div className="flex items-center gap-2.5 min-w-0">
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
               <div className="min-w-0">
@@ -656,12 +656,12 @@ export default function MissionControl({
         ) : (
           capcomBanner && (
             <div
-              className={`pointer-events-auto w-full rounded-xl border px-3.5 py-2 flex items-center justify-between gap-3 shadow-xl ${
+              className={`pointer-events-auto w-full rounded-xl px-3.5 py-2 flex items-center justify-between gap-3 shadow-xl ${
                 capcomBanner.severity === 'danger'
-                  ? 'bg-rose-950/95 border-rose-500 text-rose-100'
+                  ? 'astra-glass-alert text-rose-100'
                   : capcomBanner.severity === 'warning'
-                  ? 'bg-amber-950/95 border-amber-500 text-amber-100'
-                  : 'bg-[#0F1623]/94 border-sky-500/50 text-slate-100'
+                  ? 'astra-glass-warn text-amber-100'
+                  : 'astra-glass text-slate-100'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
@@ -707,10 +707,10 @@ export default function MissionControl({
 
       {/* Contextual Single-Building Inspector */}
       {selectedBuilding && selectedBuildingDef && (
-        <div className="absolute top-16 right-4 z-20 w-80 rounded-xl bg-[#0F1623]/95 border border-slate-700 p-4 shadow-2xl">
+        <div className="absolute top-16 right-4 z-20 w-80 rounded-xl astra-glass p-4 shadow-2xl">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div>
-              <div className="text-[10px] font-mono uppercase text-sky-400 tabular-nums">
+              <div className="text-[10px] font-mono uppercase text-cyan-300 tabular-nums">
                 Level {selectedBuilding.level} · {Math.round(selectedBuilding.conditionPct)}%
                 Integrity
                 {(selectedBuilding.dustPct || 0) >= 8
@@ -725,17 +725,17 @@ export default function MissionControl({
               type="button"
               onClick={() => setSelectedBuildingUid(null)}
               aria-label="Close module inspector"
-              className="text-slate-400 hover:text-white"
+              className="text-slate-300 hover:text-white"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed mb-3">
+          <p className="text-xs text-slate-200 leading-relaxed mb-3">
             {selectedBuildingDef.benefit}
           </p>
 
           {/* Module-Specific Output & Trade-off Readout */}
-          <div className="mb-3 p-2.5 rounded-lg bg-[#07090E] border border-slate-800 space-y-1 text-[11px] font-mono tabular-nums">
+          <div className="mb-3 p-2.5 rounded-lg astra-glass-subtle space-y-1 text-[11px] font-mono tabular-nums">
             <div className="flex justify-between text-emerald-300">
               <span className="text-slate-400">Output</span>
               <span>
@@ -821,7 +821,7 @@ export default function MissionControl({
                 <button
                   type="button"
                   onClick={() => onToggleBuilding(selectedBuilding.uid)}
-                  className="flex-1 py-2 px-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-xs font-medium flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2 px-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs font-medium flex items-center justify-center gap-1.5"
                 >
                   <Power className="w-3.5 h-3.5 text-amber-400" />
                   {selectedBuilding.online ? 'Standby' : 'Online'}
@@ -859,14 +859,14 @@ export default function MissionControl({
           <button
             type="button"
             onClick={() => interactRef.current?.()}
-            className="px-4 py-2 rounded-lg bg-[#0F1623]/95 hover:bg-slate-800 border border-sky-400 text-left shadow-xl flex items-center gap-3"
+            className="px-4 py-2 rounded-lg astra-glass border-cyan-400/70 hover:border-cyan-300 text-left shadow-xl flex items-center gap-3"
           >
-            <span className="px-2 py-0.5 rounded bg-sky-500 text-slate-950 font-mono font-bold text-xs">
+            <span className="px-2 py-0.5 rounded bg-cyan-400 text-slate-950 font-mono font-bold text-xs">
               E
             </span>
             <div>
               <div className="text-xs font-bold text-white">{nearbyTarget.actionLabel}</div>
-              <div className="text-[11px] font-mono text-slate-300">
+              <div className="text-[11px] font-mono text-slate-200">
                 {nearbyTarget.label} · {nearbyTarget.sublabel}
               </div>
             </div>
@@ -876,15 +876,15 @@ export default function MissionControl({
 
       {/* Operations Drawer Menu (opens above bottom dock on click) */}
       {!hudHidden && opsMenuOpen && (
-        <div className="fixed bottom-16 right-4 z-30 w-[min(420px,92vw)] rounded-xl bg-[#0F1623]/98 border border-slate-700 p-4 shadow-2xl">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
-            <span className="text-xs font-mono uppercase tracking-wider text-sky-400">
+        <div className="fixed bottom-16 right-4 z-30 w-[min(420px,92vw)] rounded-xl astra-glass-modal p-4 shadow-2xl">
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/15">
+            <span className="text-xs font-mono uppercase tracking-wider text-cyan-300">
               Outpost Systems &amp; Tools
             </span>
             <button
               type="button"
               onClick={() => setOpsMenuOpen(false)}
-              className="text-slate-400 hover:text-white"
+              className="text-slate-300 hover:text-white"
               aria-label="Close operations menu"
             >
               <X className="w-4 h-4" />
@@ -897,7 +897,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setOpsModal('fuel');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-emerald-300"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-emerald-300"
             >
               <Fuel className="w-3.5 h-3.5 shrink-0" />
               <span>Fuel ({state.fuel.shipTankPct}%)</span>
@@ -908,7 +908,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setOpsModal('medical');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-rose-300"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-rose-300"
             >
               <HeartPulse className="w-3.5 h-3.5 shrink-0" />
               <span>Medical {medicalAlertsCount > 0 ? `(${medicalAlertsCount})` : ''}</span>
@@ -919,7 +919,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setOpsModal('comms');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-sky-300"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-sky-300"
             >
               <Radio className="w-3.5 h-3.5 shrink-0" />
               <span>Comms {state.comms.fault ? 'FAULT' : `${state.comms.signalStrengthPct}%`}</span>
@@ -930,7 +930,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setOpsModal('damage');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-amber-300"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-amber-300"
             >
               <Wrench className="w-3.5 h-3.5 shrink-0" />
               <span>Repairs {damagedCount > 0 ? `(${damagedCount})` : ''}</span>
@@ -941,7 +941,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setOpsModal('parts');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-amber-200"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-amber-200"
             >
               <Package className="w-3.5 h-3.5 shrink-0" />
               <span>Parts {lowPartsCount > 0 ? `(${lowPartsCount})` : ''}</span>
@@ -952,7 +952,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setOpsModal('flue');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-slate-200"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-slate-200"
             >
               <Fan className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <span>Flue ({state.stormFlue.cloggedPct}%)</span>
@@ -963,7 +963,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setOpsModal('build_module');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-emerald-300"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-emerald-300"
             >
               <PlusCircle className="w-3.5 h-3.5 shrink-0" />
               <span>Expand ({state.budget})</span>
@@ -974,7 +974,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setActiveModal('telemetry');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-sky-300"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-sky-300"
             >
               <Activity className="w-3.5 h-3.5 shrink-0" />
               <span>Data ({collectedCount}/{state.dataNodes.length})</span>
@@ -985,7 +985,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setActiveModal('research');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-emerald-300"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-emerald-300"
             >
               <FlaskConical className="w-3.5 h-3.5 shrink-0" />
               <span>Lab ({state.sciencePoints})</span>
@@ -996,7 +996,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setOpsModal('whatif');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-slate-200"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-slate-200"
             >
               <Sliders className="w-3.5 h-3.5 text-sky-400 shrink-0" />
               <span>What-If</span>
@@ -1007,7 +1007,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 onToggleShelterRefuge();
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-slate-200"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-slate-200"
             >
               <Shield className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <span>{state.shelterRefugeActive ? 'Exit Shelter' : 'Shelter Drill'}</span>
@@ -1018,7 +1018,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setInspectEquipmentId('solar_array');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-cyan-300"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-cyan-300"
             >
               <Compass className="w-3.5 h-3.5 shrink-0" />
               <span>3D Equipment</span>
@@ -1029,7 +1029,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setAstronautGalleryOpen(true);
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-sky-300"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-sky-300"
             >
               <User className="w-3.5 h-3.5 shrink-0" />
               <span>Suit Studio</span>
@@ -1040,7 +1040,7 @@ export default function MissionControl({
                 setOpsMenuOpen(false);
                 setOpsModal('achievements');
               }}
-              className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-amber-300"
+              className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-amber-300"
             >
               <Award className="w-3.5 h-3.5 shrink-0" />
               <span>Honors</span>
@@ -1053,7 +1053,7 @@ export default function MissionControl({
                   stopNasaSpeech();
                   onTriggerStormScene();
                 }}
-                className="p-2.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2 text-amber-300"
+                className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-left flex items-center gap-2 text-amber-300"
               >
                 <CloudLightning className="w-3.5 h-3.5 shrink-0" />
                 <span>Storm View</span>
@@ -1072,16 +1072,16 @@ export default function MissionControl({
         <button
           type="button"
           onClick={() => setHudHidden((h) => !h)}
-          className="px-2.5 py-1 rounded-lg bg-[#0F1623]/92 border border-slate-700 hover:border-sky-400 text-[11px] font-mono text-slate-300 flex items-center gap-1.5"
+          className="px-2.5 py-1 rounded-lg astra-glass-pill border border-cyan-300/25 hover:border-cyan-400 text-[11px] font-mono text-slate-200 flex items-center gap-1.5"
         >
-          {hudHidden ? <Eye className="w-3.5 h-3.5 text-sky-400" /> : <EyeOff className="w-3.5 h-3.5" />}
+          {hudHidden ? <Eye className="w-3.5 h-3.5 text-cyan-400" /> : <EyeOff className="w-3.5 h-3.5" />}
           {hudHidden ? 'Show HUD' : 'Hide HUD'}
         </button>
       </div>
 
       {/* Single-Row Bottom Dock */}
       {!hudHidden && (
-        <footer className="absolute bottom-0 inset-x-0 z-20 bg-[#0F1623]/95 border-t border-slate-800 px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2">
+        <footer className="absolute bottom-0 inset-x-0 z-20 astra-glass-dock border-t px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2">
           {/* Crew Switcher */}
           <div className="flex flex-wrap items-center gap-1">
             {ASTRONAUTS.map((astro) => {
@@ -1096,10 +1096,10 @@ export default function MissionControl({
                   onClick={() => onSelectAstronaut(astro.id)}
                   className={`px-2 py-1 rounded-lg border text-xs flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
                     vitals?.medicalAlert
-                      ? 'bg-rose-950/50 border-rose-500 text-rose-100'
+                      ? 'astra-glass-alert text-rose-100'
                       : isSelected
-                      ? 'bg-sky-500/20 border-sky-400 text-white font-semibold'
-                      : 'bg-[#07090E] border-slate-800 text-slate-300 hover:border-slate-600'
+                      ? 'bg-cyan-500/25 border-cyan-400 text-white font-semibold'
+                      : 'astra-glass-subtle text-slate-200 hover:border-cyan-400/50'
                   }`}
                 >
                   <span
@@ -1126,7 +1126,7 @@ export default function MissionControl({
                 <button
                   type="button"
                   onClick={() => jumpRef.current?.()}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-xs font-mono text-cyan-300 flex items-center gap-1 whitespace-nowrap"
+                  className="px-2.5 py-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs font-mono text-cyan-300 flex items-center gap-1 whitespace-nowrap"
                 >
                   <ArrowUp className="w-3.5 h-3.5" />
                   Jump
@@ -1137,8 +1137,8 @@ export default function MissionControl({
                   disabled={state.rover.damaged}
                   className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono flex items-center gap-1 whitespace-nowrap ${
                     state.rover.manualControl
-                      ? 'bg-sky-500 text-slate-950 border-sky-400 font-bold'
-                      : 'bg-[#07090E] border-slate-700 text-slate-300 hover:text-white'
+                      ? 'bg-cyan-400 text-slate-950 border-cyan-300 font-bold'
+                      : 'astra-glass-subtle hover:border-cyan-400/50 text-slate-200 hover:text-white'
                   }`}
                 >
                   <Car className="w-3.5 h-3.5" />
@@ -1147,7 +1147,7 @@ export default function MissionControl({
                 <button
                   type="button"
                   onClick={cycleCameraMode}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-xs font-mono text-sky-300 flex items-center gap-1 whitespace-nowrap"
+                  className="px-2.5 py-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs font-mono text-sky-300 flex items-center gap-1 whitespace-nowrap"
                 >
                   <Video className="w-3.5 h-3.5" />
                   {cameraMode === 'follow'
@@ -1164,11 +1164,11 @@ export default function MissionControl({
               onClick={() => setOpsMenuOpen((o) => !o)}
               className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 whitespace-nowrap ${
                 medicalAlertsCount > 0 || damagedCount > 0 || state.comms.fault
-                  ? 'bg-amber-500/15 border-amber-400 text-amber-200'
-                  : 'bg-[#07090E] hover:bg-slate-800 border-slate-700 text-slate-200'
+                  ? 'astra-glass-warn text-amber-200'
+                  : 'astra-glass-subtle hover:border-cyan-400/50 text-slate-200'
               }`}
             >
-              <Wrench className="w-3.5 h-3.5 text-sky-400" />
+              <Wrench className="w-3.5 h-3.5 text-cyan-400" />
               Operations
               {medicalAlertsCount + damagedCount + (state.comms.fault ? 1 : 0) > 0 && (
                 <span className="font-mono text-[11px] text-amber-300">
@@ -1182,11 +1182,11 @@ export default function MissionControl({
               onClick={() => setActiveModal('objectives')}
               className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono tabular-nums flex items-center gap-1.5 whitespace-nowrap transition-colors ${
                 dailyCompletion.allCompleted
-                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
-                  : 'bg-[#07090E] hover:bg-slate-800 border-slate-700 text-slate-200'
+                  ? 'astra-glass-success text-emerald-200'
+                  : 'astra-glass-subtle hover:border-cyan-400/50 text-slate-200'
               }`}
             >
-              <ListChecks className="w-3.5 h-3.5 text-sky-400" />
+              <ListChecks className="w-3.5 h-3.5 text-cyan-400" />
               <span>
                 Goals {dailyCompletion.completedObjectivesCount}/{dailyCompletion.totalObjectivesCount}
               </span>
@@ -1195,7 +1195,7 @@ export default function MissionControl({
             <button
               type="button"
               onClick={() => setAdvisorOpen(true)}
-              className="px-2.5 py-1.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-xs font-medium text-sky-300 flex items-center gap-1.5 whitespace-nowrap"
+              className="px-2.5 py-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs font-medium text-cyan-300 flex items-center gap-1.5 whitespace-nowrap"
             >
               <Bot className="w-3.5 h-3.5" /> Advisor
             </button>
@@ -1217,38 +1217,38 @@ export default function MissionControl({
 
       {/* Resource Diagnostics Modal */}
       {selectedResource && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="max-w-md w-full rounded-xl bg-space-900 border border-slate-700 p-6 relative">
+        <div className="fixed inset-0 z-50 astra-glass-backdrop flex items-center justify-center p-4">
+          <div className="max-w-md w-full rounded-xl astra-glass-modal p-6 relative">
             <button
               type="button"
               onClick={() => setSelectedResource(null)}
               aria-label="Close diagnostics"
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              className="absolute top-4 right-4 text-slate-300 hover:text-white"
             >
               <X className="w-5 h-5" />
             </button>
-            <div className="text-xs font-mono text-sky-400 mb-1">System Diagnostics</div>
+            <div className="text-xs font-mono text-cyan-300 mb-1">System Diagnostics</div>
             <h3 className="font-display text-2xl font-bold text-white capitalize mb-4">
               {selectedResource} Management
             </h3>
 
             {selectedResource === 'oxygen' && (
               <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Current Reserve</span>
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Current Reserve</span>
                   <span className="font-mono font-bold text-white">
                     {state.resources.oxygen.current} / 100
                   </span>
                 </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Production / Consumed</span>
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Production / Consumed</span>
                   <span className="font-mono text-emerald-400">
                     +{preview.oxygenProd} / -{preview.oxygenCons}
                   </span>
                 </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Projected Duration</span>
-                  <span className="font-mono text-sky-400">
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Projected Duration</span>
+                  <span className="font-mono text-cyan-300">
                     {expectedDaysLeft(
                       state.resources.oxygen.current,
                       preview.oxygenProd,
@@ -1261,21 +1261,21 @@ export default function MissionControl({
 
             {selectedResource === 'water' && (
               <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Current Water Reserve</span>
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Current Water Reserve</span>
                   <span className="font-mono font-bold text-white">
                     {state.resources.water.current} / 100
                   </span>
                 </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Production / Demand</span>
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Production / Demand</span>
                   <span className="font-mono text-emerald-400">
                     +{preview.waterProd} / -{preview.waterCons}
                   </span>
                 </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Projected Duration</span>
-                  <span className="font-mono text-sky-400">
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Projected Duration</span>
+                  <span className="font-mono text-cyan-300">
                     {expectedDaysLeft(
                       state.resources.water.current,
                       preview.waterProd,
@@ -1288,21 +1288,21 @@ export default function MissionControl({
 
             {selectedResource === 'food' && (
               <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Food Rations</span>
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Food Rations</span>
                   <span className="font-mono font-bold text-white">
                     {state.resources.food.current} / 100
                   </span>
                 </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Greenhouse Yield / Demand</span>
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Greenhouse Yield / Demand</span>
                   <span className="font-mono text-emerald-400">
                     +{preview.foodProd} / -{preview.foodCons}
                   </span>
                 </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Projected Duration</span>
-                  <span className="font-mono text-sky-400">
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Projected Duration</span>
+                  <span className="font-mono text-cyan-300">
                     {expectedDaysLeft(
                       state.resources.food.current,
                       preview.foodProd,
@@ -1315,41 +1315,41 @@ export default function MissionControl({
 
             {selectedResource === 'power' && (
               <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Battery Storage</span>
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Battery Storage</span>
                   <span className="font-mono font-bold text-white">
                     {state.resources.battery.current} / {state.resources.battery.max} kWh
                   </span>
                 </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Solar Gen / Base Load</span>
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Solar Gen / Base Load</span>
                   <span className="font-mono text-emerald-400">
                     +{preview.powerGen} / -{preview.powerUsed} kWh
                   </span>
                 </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Solar Condition</span>
-                  <span className="font-mono text-sky-300">{preview.solarCondition}</span>
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Solar Condition</span>
+                  <span className="font-mono text-cyan-300">{preview.solarCondition}</span>
                 </div>
               </div>
             )}
 
             {selectedResource === 'radiation' && (
               <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Outpost Radiation Shielding</span>
-                  <span className="font-mono font-bold text-sky-300">
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Outpost Radiation Shielding</span>
+                  <span className="font-mono font-bold text-cyan-300">
                     {Math.round(state.resources.shielding)}%
                   </span>
                 </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Crew Cumulative Exposure</span>
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Crew Cumulative Exposure</span>
                   <span className="font-mono font-bold text-amber-300">
                     {Math.round(state.crew.radiationExposure)}%
                   </span>
                 </div>
-                <div className="flex justify-between p-3 rounded-lg bg-space-950">
-                  <span className="text-slate-400">Environmental Hazard Factor</span>
+                <div className="flex justify-between p-3 rounded-lg astra-glass-subtle">
+                  <span className="text-slate-300">Environmental Hazard Factor</span>
                   <span className="font-mono text-slate-200">{planet.radiationHazard}×</span>
                 </div>
               </div>
@@ -1359,7 +1359,7 @@ export default function MissionControl({
               <button
                 type="button"
                 onClick={() => setSelectedResource(null)}
-                className="px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-semibold text-sm"
+                className="px-4 py-2 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-semibold text-sm"
               >
                 Close
               </button>
@@ -1370,13 +1370,13 @@ export default function MissionControl({
 
       {/* Telemetry / Research Modal */}
       {activeModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="max-w-2xl w-full rounded-xl bg-space-900 border border-slate-700 p-6 relative max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 astra-glass-backdrop flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full rounded-xl astra-glass-modal p-6 relative max-h-[85vh] overflow-y-auto">
             <button
               type="button"
               onClick={() => setActiveModal(null)}
               aria-label="Close modal"
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              className="absolute top-4 right-4 text-slate-300 hover:text-white"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1384,7 +1384,7 @@ export default function MissionControl({
             {activeModal === 'telemetry' && (
               <div className="space-y-5">
                 <div>
-                  <div className="text-xs font-mono text-sky-400 mb-1">
+                  <div className="text-xs font-mono text-cyan-300 mb-1">
                     {state.planetName} · Telemetry &amp; Planetary Data
                   </div>
                   <h3 className="font-display text-2xl font-bold text-white">
@@ -1392,12 +1392,12 @@ export default function MissionControl({
                   </h3>
                 </div>
 
-                <div className="p-4 rounded-lg bg-space-950 border border-slate-800">
+                <div className="p-4 rounded-lg astra-glass-subtle">
                   <MissionChart history={state.history} />
                 </div>
 
                 <div>
-                  <div className="text-xs font-mono uppercase text-sky-400 mb-2">
+                  <div className="text-xs font-mono uppercase text-cyan-300 mb-2">
                     {state.planetName} Planetary Data Nodes ({collectedCount}/{state.dataNodes.length})
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -1406,23 +1406,23 @@ export default function MissionControl({
                         key={node.id}
                         className={`p-3 rounded-lg border text-xs ${
                           node.collected
-                            ? 'bg-emerald-950/30 border-emerald-500/40'
-                            : 'bg-space-950 border-slate-800'
+                            ? 'astra-glass-success'
+                            : 'astra-glass-subtle'
                         }`}
                       >
                         <div className="flex items-center justify-between font-semibold text-white mb-1">
                           <span>{node.label}</span>
-                          <span className="font-mono text-sky-400">+{node.scienceValue} SCI</span>
+                          <span className="font-mono text-cyan-300">+{node.scienceValue} SCI</span>
                         </div>
                         <div className="font-mono text-[11px] text-amber-300 mb-1">
                           {node.reading}
                         </div>
-                        <p className="text-slate-400">{node.summary}</p>
+                        <p className="text-slate-300">{node.summary}</p>
                         {!node.collected && (
                           <button
                             type="button"
                             onClick={() => handleCollectNodeWithDuty(node.id)}
-                            className="mt-2 px-2.5 py-1 rounded bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold"
+                            className="mt-2 px-2.5 py-1 rounded bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-semibold"
                           >
                             Collect Sample Now
                           </button>
@@ -1433,20 +1433,20 @@ export default function MissionControl({
                 </div>
 
                 <div>
-                  <div className="text-xs font-mono uppercase text-sky-400 mb-2">
+                  <div className="text-xs font-mono uppercase text-cyan-300 mb-2">
                     Mission Activity Log
                   </div>
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                     {state.activityLog.map((entry) => (
                       <div
                         key={entry.id}
-                        className="p-2.5 rounded-lg border border-slate-800 bg-space-950 text-xs"
+                        className="p-2.5 rounded-lg astra-glass-subtle text-xs"
                       >
                         <div className="font-mono text-[11px] text-slate-400">
                           Day {String(entry.day).padStart(2, '0')} · {entry.time}
                         </div>
                         <div className="font-semibold text-white">{entry.title}</div>
-                        <div className="text-slate-300">{entry.detail}</div>
+                        <div className="text-slate-200">{entry.detail}</div>
                       </div>
                     ))}
                   </div>
@@ -1457,21 +1457,21 @@ export default function MissionControl({
             {activeModal === 'objectives' && (
               <div className="space-y-4">
                 <div>
-                  <div className="text-xs font-mono uppercase tracking-wider text-sky-400 mb-1">
+                  <div className="text-xs font-mono uppercase tracking-wider text-cyan-300 mb-1">
                     Day {String(state.day).padStart(2, '0')} / {state.maxDays} · Automatic Progression Protocol
                   </div>
                   <h3 className="font-display text-2xl font-bold text-white">
                     Daily Mission Objectives
                   </h3>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-slate-300 mt-1">
                     Complete all crew shifts, clear the Storm Flue, and log all {state.planetName} data nodes to complete Day {state.day}. The next day starts automatically once every objective is met.
                   </p>
                 </div>
 
                 {/* 1. Crew Daily Shifts */}
-                <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 space-y-2.5">
+                <div className="p-3.5 rounded-lg astra-glass-subtle space-y-2.5">
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-slate-200 font-semibold">
+                    <span className="text-slate-100 font-semibold">
                       1. Crew Daily Shifts ({dailyCompletion.crewDoneCount}/{dailyCompletion.crewTotal})
                     </span>
                     <span
@@ -1482,7 +1482,7 @@ export default function MissionControl({
                       {dailyCompletion.allCrewTasksDone ? 'COMPLETED' : 'IN PROGRESS'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-300">
                     Click any pending crew member below, then service a building, collect data, purge the flue, or run a Crew Suit diagnostic.
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -1498,8 +1498,8 @@ export default function MissionControl({
                           }}
                           className={`px-2.5 py-2 rounded-lg border text-left text-xs flex items-center justify-between gap-2 transition-colors ${
                             done
-                              ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
-                              : 'bg-[#07090E] border-slate-700 hover:border-sky-400 text-slate-200'
+                              ? 'astra-glass-success text-emerald-200'
+                              : 'astra-glass-subtle hover:border-cyan-400 text-slate-200'
                           }`}
                         >
                           <div className="min-w-0">
@@ -1522,12 +1522,12 @@ export default function MissionControl({
                 </div>
 
                 {/* 2. Storm Flue Daily Inspection */}
-                <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 flex items-center justify-between gap-3">
+                <div className="p-3.5 rounded-lg astra-glass-subtle flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-xs font-mono font-semibold text-slate-200">
+                    <div className="text-xs font-mono font-semibold text-slate-100">
                       2. Storm Flue Exhaust Inspection
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
+                    <div className="text-[11px] text-slate-300 mt-0.5">
                       Inspect &amp; purge exhaust vents on {state.planetName} (current blockage: {state.stormFlue.cloggedPct}%).
                     </div>
                   </div>
@@ -1550,12 +1550,12 @@ export default function MissionControl({
                 </div>
 
                 {/* 3. Planetary Data Nodes */}
-                <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 flex items-center justify-between gap-3">
+                <div className="p-3.5 rounded-lg astra-glass-subtle flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-xs font-mono font-semibold text-slate-200">
+                    <div className="text-xs font-mono font-semibold text-slate-100">
                       3. {state.planetName} Data Collection ({dailyCompletion.dataCollectedCount}/{dailyCompletion.dataTotal})
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
+                    <div className="text-[11px] text-slate-300 mt-0.5">
                       Scan &amp; collect all planetary science nodes in the field or Telemetry Lab.
                     </div>
                   </div>
@@ -1567,7 +1567,7 @@ export default function MissionControl({
                     <button
                       type="button"
                       onClick={() => setActiveModal('telemetry')}
-                      className="px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs shrink-0"
+                      className="px-3 py-1.5 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-semibold text-xs shrink-0"
                     >
                       View Nodes
                     </button>
@@ -1576,7 +1576,7 @@ export default function MissionControl({
 
                 {/* 4. Emergency Clearance */}
                 {!dailyCompletion.emergencyClear && (
-                  <div className="p-3.5 rounded-lg bg-rose-950/40 border border-rose-500/60 flex items-center justify-between gap-3">
+                  <div className="p-3.5 rounded-lg astra-glass-alert flex items-center justify-between gap-3">
                     <div>
                       <div className="text-xs font-mono font-semibold text-rose-200">
                         4. Resolve Active Emergency
@@ -1631,11 +1631,11 @@ export default function MissionControl({
                   ].map((tech) => (
                     <div
                       key={tech.id}
-                      className="p-3.5 rounded-lg bg-space-950 border border-slate-800 flex items-center justify-between gap-3"
+                      className="p-3.5 rounded-lg astra-glass-subtle flex items-center justify-between gap-3"
                     >
                       <div>
                         <div className="font-semibold text-sm text-white">{tech.title}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">{tech.desc}</div>
+                        <div className="text-xs text-slate-300 mt-0.5">{tech.desc}</div>
                       </div>
                       <button
                         type="button"
@@ -1644,7 +1644,7 @@ export default function MissionControl({
                         className={`px-3 py-2 rounded-lg font-mono tabular-nums text-xs font-bold shrink-0 ${
                           state.sciencePoints >= tech.cost
                             ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
-                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                            : 'bg-slate-800/70 text-slate-500 cursor-not-allowed'
                         }`}
                       >
                         {tech.cost} SCI

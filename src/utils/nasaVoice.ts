@@ -5,6 +5,8 @@ export interface NasaSpeechOptions {
   urgent?: boolean;
   rate?: number;
   pitch?: number;
+  queue?: boolean;
+  radioComms?: boolean;
   onStart?: (voiceName: string) => void;
   onEnd?: () => void;
 }
@@ -29,6 +31,62 @@ export function pickFemaleNasaVoice(
   );
   if (femaleMatch) return femaleMatch;
   return pool[0] || null;
+}
+
+export function playQuindarTone(phase: 'intro' | 'outro' = 'intro'): void {
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+
+    // Authentic Apollo/Artemis Quindar PTT tone (2524 Hz intro, 2475 Hz outro) + subtle VHF squelch burst
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(phase === 'intro' ? 2524 : 2475, now);
+
+    const toneDur = phase === 'intro' ? 0.14 : 0.11;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.052, now + 0.012);
+    gain.gain.setValueAtTime(0.052, now + toneDur - 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + toneDur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + toneDur + 0.02);
+
+    // Subtle crisp radio mic click / VHF squelch burst
+    const sqLen = Math.floor(ctx.sampleRate * 0.055);
+    const sqBuf = ctx.createBuffer(1, sqLen, ctx.sampleRate);
+    const ch = sqBuf.getChannelData(0);
+    for (let i = 0; i < sqLen; i++) {
+      ch[i] = (Math.random() * 2 - 1) * (1 - i / sqLen);
+    }
+    const sqSrc = ctx.createBufferSource();
+    sqSrc.buffer = sqBuf;
+    const sqFilter = ctx.createBiquadFilter();
+    sqFilter.type = 'bandpass';
+    sqFilter.frequency.setValueAtTime(1950, now);
+    sqFilter.Q.setValueAtTime(1.4, now);
+    const sqGain = ctx.createGain();
+    sqGain.gain.setValueAtTime(0.028, now + 0.02);
+    sqGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.075);
+    sqSrc.connect(sqFilter);
+    sqFilter.connect(sqGain);
+    sqGain.connect(ctx.destination);
+    sqSrc.start(now + 0.02);
+
+    window.setTimeout(() => {
+      if (ctx.state !== 'closed') {
+        ctx.close().catch(() => {});
+      }
+    }, 320);
+  } catch {
+    // Ignore audio context restrictions
+  }
 }
 
 export function playCapcomChime(urgent = false): void {
@@ -93,6 +151,8 @@ export function speakNasaText(text: string, options: NasaSpeechOptions = {}): vo
     urgent = false,
     rate = 0.98,
     pitch = 1.12,
+    queue = false,
+    radioComms = false,
     onStart,
     onEnd,
   } = options;
@@ -103,8 +163,15 @@ export function speakNasaText(text: string, options: NasaSpeechOptions = {}): vo
 
   const dispatch = () => {
     try {
-      synth.cancel();
-      playCapcomChime(urgent);
+      if (!queue) {
+        synth.cancel();
+      }
+      if (!radioComms) {
+        playCapcomChime(urgent);
+      } else if (!synth.speaking && !synth.pending) {
+        playQuindarTone('intro');
+      }
+
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = synth.getVoices();
       const femaleVoice = pickFemaleNasaVoice(voices);
@@ -114,11 +181,17 @@ export function speakNasaText(text: string, options: NasaSpeechOptions = {}): vo
       utterance.lang = femaleVoice?.lang || 'en-US';
       utterance.pitch = pitch;
       utterance.rate = rate;
-      utterance.volume = 0.95;
+      utterance.volume = 0.96;
       utterance.onstart = () => {
+        if (radioComms && queue) {
+          playQuindarTone('intro');
+        }
         onStart?.(femaleVoice?.name || 'NASA Flight Officer');
       };
       utterance.onend = () => {
+        if (radioComms) {
+          playQuindarTone('outro');
+        }
         onEnd?.();
       };
       utterance.onerror = () => {

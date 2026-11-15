@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { Volume2, VolumeX } from 'lucide-react';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { ASTRONAUTS } from '../data/astronauts';
 import { getPlanetById } from '../data/planets';
 import { speakNasaText, stopNasaSpeech } from '../utils/nasaVoice';
+import { createSpacecraftAudioEngine } from '../utils/spacecraftAudio';
 import {
   createAstronautMesh,
   createContactShadowTexture,
@@ -312,6 +314,7 @@ export default function MissionLaunchScene({
   planetId,
   startStage = 'boarding',
   isAudioMuted,
+  onToggleAudio,
   onComplete,
 }: MissionLaunchSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -320,6 +323,7 @@ export default function MissionLaunchScene({
   const stormOverlayStyle = getStormOverlayRgba(planetId);
   const [stage, setStage] = useState<LaunchStageId>(startStage);
   const [stormOverlayLevel, setStormOverlayLevel] = useState(0);
+  const [commsCaption, setCommsCaption] = useState<string | null>(null);
 
   const selectedFlagPreset = FLAG_SITE_PRESETS[0];
   const selectedFlagRef = useRef(selectedFlagPreset);
@@ -329,42 +333,12 @@ export default function MissionLaunchScene({
   onCompleteRef.current = onComplete;
   const mutedRef = useRef(isAudioMuted);
   mutedRef.current = isAudioMuted;
-  const spokenStageKeyRef = useRef<string>('');
-
-  const speakBriefing = (text: string, urgent = false) => {
-    speakNasaText(text, {
-      muted: mutedRef.current,
-      urgent,
-      rate: 0.96,
-      pitch: 1.12,
-    });
-  };
 
   useEffect(() => {
     if (isAudioMuted) {
       stopNasaSpeech();
-      return;
     }
-
-    if (stage === 'transit') {
-      const key = `transit-${planetId}`;
-      if (spokenStageKeyRef.current !== key) {
-        spokenStageKeyRef.current = key;
-        speakBriefing(briefing.spokenScript, false);
-      }
-    } else if (stage === 'disembark') {
-      const key = `disembark-${planetId}`;
-      if (spokenStageKeyRef.current !== key) {
-        spokenStageKeyRef.current = key;
-        speakBriefing(
-          `Touchdown confirmed on ${planet.name}. Airlock open and ramp deployed. Crew disembarking onto the surface.`,
-          false
-        );
-      }
-    } else {
-      stopNasaSpeech();
-    }
-  }, [isAudioMuted, stage, planetId]);
+  }, [isAudioMuted]);
 
   useEffect(() => {
     return () => {
@@ -1089,65 +1063,30 @@ export default function MissionLaunchScene({
       };
     });
 
-    // Procedural thruster & wind audio
-    let audioCtx: AudioContext | null = null;
-    let thrusterGain: GainNode | null = null;
-    let windGain: GainNode | null = null;
-    let noiseSrc: AudioBufferSourceNode | null = null;
-    let bassOsc: OscillatorNode | null = null;
+    // Multi-layered realistic spacecraft audio (liftoff rumble, crackle, LOX vent, space cruise, RCS jets, plasma entry, wind, touchdown)
+    const spaceAudio = createSpacecraftAudioEngine();
+    const firedVoiceCues = new Set<string>();
+    const firedSfxEvents = new Set<string>();
+    let lastRcsPuffAt = -10;
+    let lastAltimeterAt = -10;
 
-    if (!isAudioMuted) {
-      try {
-        const AudioCtx =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-        if (AudioCtx) {
-          audioCtx = new AudioCtx();
-          const bufLen = audioCtx.sampleRate * 2;
-          const noiseBuf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
-          const ch = noiseBuf.getChannelData(0);
-          for (let i = 0; i < bufLen; i++) ch[i] = Math.random() * 2 - 1;
-          noiseSrc = audioCtx.createBufferSource();
-          noiseSrc.buffer = noiseBuf;
-          noiseSrc.loop = true;
-
-          const lowFilter = audioCtx.createBiquadFilter();
-          lowFilter.type = 'lowpass';
-          lowFilter.frequency.value = 180;
-          thrusterGain = audioCtx.createGain();
-          thrusterGain.gain.value = 0.0001;
-
-          const bandFilter = audioCtx.createBiquadFilter();
-          bandFilter.type = 'bandpass';
-          bandFilter.frequency.value = 340;
-          bandFilter.Q.value = 0.9;
-          windGain = audioCtx.createGain();
-          windGain.gain.value = 0.0001;
-
-          bassOsc = audioCtx.createOscillator();
-          bassOsc.type = 'sawtooth';
-          bassOsc.frequency.value = 46;
-          const bassLow = audioCtx.createBiquadFilter();
-          bassLow.type = 'lowpass';
-          bassLow.frequency.value = 95;
-
-          noiseSrc.connect(lowFilter);
-          lowFilter.connect(thrusterGain);
-          thrusterGain.connect(audioCtx.destination);
-          noiseSrc.connect(bandFilter);
-          bandFilter.connect(windGain);
-          windGain.connect(audioCtx.destination);
-          bassOsc.connect(bassLow);
-          bassLow.connect(thrusterGain);
-
-          noiseSrc.start();
-          bassOsc.start();
-          if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-        }
-      } catch {
-        audioCtx = null;
-      }
-    }
+    const triggerVoiceCue = (
+      cueKey: string,
+      text: string,
+      opts: { queue?: boolean; urgent?: boolean } = {}
+    ) => {
+      if (firedVoiceCues.has(cueKey)) return;
+      firedVoiceCues.add(cueKey);
+      setCommsCaption(text);
+      speakNasaText(text, {
+        muted: mutedRef.current,
+        queue: opts.queue ?? true,
+        urgent: opts.urgent ?? false,
+        radioComms: true,
+        rate: 1.0,
+        pitch: 1.1,
+      });
+    };
 
     if (!isSoftwareGl) renderer.compile(scene, camera);
 
@@ -1245,8 +1184,13 @@ export default function MissionLaunchScene({
       disembarkGroup.visible = curStage === 'disembark';
       altitudeSky.mesh.visible = curStage !== 'transit';
 
-      let targetThrustAudio = 0.0001;
-      let targetWindAudio = 0.0001;
+      let audioThrustLevel = 0;
+      let audioCrackleLevel = 0;
+      let audioLoxLevel = 0;
+      let audioPlasmaLevel = 0;
+      let audioWindLevel = 0;
+      let audioCabinLevel = 0;
+      let audioMaxQLevel = 0;
 
       if (curStage === 'boarding') {
         const t = seqTime;
@@ -1304,8 +1248,40 @@ export default function MissionLaunchScene({
           liftoffFlame.outerCone.scale.set(1.15, fl * (0.82 + liftoffP * 1.55), 1.15);
           liftoffFlame.shockDiamond.visible = liftoffP > 0.05;
           liftoffFlame.light.intensity = 7.4 * fl * flameStrength;
-          targetThrustAudio = 0.072 * flameStrength;
         }
+
+        // Takeoff realistic voices & multi-stage rocket audio
+        if (t >= 0.25) {
+          triggerVoiceCue(
+            'takeoff-boarding',
+            `Flight Control here. Crew aboard Starship for ${planet.name}. Hatches sealed, cryogenic tanks pressurized.`,
+            { queue: false }
+          );
+        }
+        if (t >= 3.2) {
+          triggerVoiceCue(
+            'takeoff-ignition',
+            'Umbilicals retracted. Three, two, one... main engine ignition and liftoff!',
+            { queue: true }
+          );
+        }
+        if (t >= 6.45) {
+          triggerVoiceCue(
+            'takeoff-maxq',
+            'Tower cleared. Pitch program nominal, passing Max Q toward Earth orbit.',
+            { queue: true }
+          );
+        }
+
+        if (t >= 3.6 && !firedSfxEvents.has('liftoff-ignition')) {
+          firedSfxEvents.add('liftoff-ignition');
+          spaceAudio.triggerIgnitionBurst();
+        }
+
+        audioLoxLevel = Math.max(0.08, 0.72 * Math.max(0, 1 - liftoffP * 4.2));
+        audioThrustLevel = flameStrength * THREE.MathUtils.lerp(1.0, 0.62, Math.max(0, liftoffP - 0.55) / 0.45);
+        audioCrackleLevel = flameStrength * Math.max(0.25, 1 - liftoffP * 0.68);
+        audioMaxQLevel = maxQP > 0 ? maxQP : 0;
 
         // LOX cryogenic chilldown steam venting pre-ignition
         const loxFade = Math.max(0, 1 - liftoffP * 4.5);
@@ -1537,7 +1513,36 @@ export default function MissionLaunchScene({
         camera.position.copy(_camPos);
         camera.lookAt(_camLook);
 
-        targetThrustAudio = 0.042 * burnLevel;
+        // Transit realistic voices & deep-space propulsion / RCS cold-gas audio
+        if (localT >= 0.35) {
+          triggerVoiceCue(
+            `transit-tli-${planetId}`,
+            `Earth escape burn complete. En route to ${planet.name}. Estimated transit ${briefing.etaLabel}.`,
+            { queue: startStage !== 'transit' }
+          );
+        }
+        if (localT >= 7.2) {
+          triggerVoiceCue(
+            `transit-brief-${planetId}`,
+            `${planet.name} telemetry: ${briefing.weatherLabel}. ${briefing.precautionsLabel}`,
+            { queue: true }
+          );
+        }
+        if (localT >= 15.8) {
+          triggerVoiceCue(
+            `transit-capture-${planetId}`,
+            `Approaching ${planet.name} orbital capture. Firing braking thrusters and aligning for entry.`,
+            { queue: true }
+          );
+        }
+
+        if (p > 0.35 && p < 0.85 && rcsWave > 0.45 && elapsed - lastRcsPuffAt > 1.75) {
+          lastRcsPuffAt = elapsed;
+          spaceAudio.triggerRcsPuff();
+        }
+
+        audioThrustLevel = 0.44 * burnLevel;
+        audioCabinLevel = 0.85;
         if (lastReportedStorm !== 0) {
           lastReportedStorm = 0;
           setStormOverlayLevel(0);
@@ -1797,8 +1802,53 @@ export default function MissionLaunchScene({
         camera.position.copy(_camPos);
         camera.lookAt(_camLook);
 
-        targetThrustAudio = 0.068 * fireFade + 0.025 * plasmaEnvelope + 0.0001;
-        targetWindAudio = isAtmoWorld ? 0.048 * stormIntensity + 0.0001 : 0.0001;
+        // Landing realistic voices & entry/descent/touchdown physics audio
+        if (localT >= 0.3) {
+          triggerVoiceCue(
+            `landing-entry-${planetId}`,
+            isAtmoWorld
+              ? `Entry interface confirmed at ${planet.name}. Aerobraking through upper atmosphere, heat shield nominal.`
+              : `Powered descent initiated over ${planet.name}. Braking thrusters active, tracking landing beacon.`,
+            { queue: false }
+          );
+        }
+        if (localT >= 5.5) {
+          triggerVoiceCue(
+            `landing-flip-${planetId}`,
+            isAtmoWorld
+              ? `Deceleration complete. Belly-flip maneuver initiated, landing engines igniting for vertical hover-slam.`
+              : `Pitch-over maneuver complete. Final vertical approach to touchdown pad, altitude thirty meters.`,
+            { queue: true }
+          );
+        }
+        if (localT >= 10.6) {
+          triggerVoiceCue(
+            `landing-touchdown-${planetId}`,
+            `Ten meters... five... contact light! Engines shut down. Touchdown confirmed on ${planet.name}.`,
+            { queue: true }
+          );
+        }
+
+        // Vacuum radar altimeter pings on Moon & Europa approaching pad
+        if (!isAtmoWorld && p > 0.56 && p < 0.985) {
+          const pingPeriod = THREE.MathUtils.lerp(1.05, 0.42, (p - 0.56) / 0.425);
+          if (elapsed - lastAltimeterAt >= pingPeriod) {
+            lastAltimeterAt = elapsed;
+            spaceAudio.triggerAltimeterPing((p - 0.56) / 0.44);
+          }
+        }
+
+        // Touchdown shock impact & valve shutoff relief
+        if (p >= 0.992 && !firedSfxEvents.has('touchdown-impact')) {
+          firedSfxEvents.add('touchdown-impact');
+          spaceAudio.triggerTouchdownImpact();
+        }
+
+        audioThrustLevel = fireFade * 0.88;
+        audioCrackleLevel = isAtmoWorld ? fireFade * 0.55 : fireFade * 0.14;
+        audioPlasmaLevel = plasmaEnvelope * 0.95;
+        audioWindLevel = isAtmoWorld ? 0.68 * stormIntensity : 0;
+        audioCabinLevel = p < 1 ? 0.3 : 0.12;
       } else {
         // ACT 4 (8.2s): SLIDING DOORS OPEN -> HINGED RAMP UNFOLDS -> FULL-SCALE CREW DISEMBARKS -> FLAG PLANTED
         const localT = seqTime - (BOARDING_DURATION + TRANSIT_DURATION + LANDING_DURATION);
@@ -2011,20 +2061,35 @@ export default function MissionLaunchScene({
         camera.position.copy(_camPos);
         camera.lookAt(_camLook);
 
-        targetWindAudio = isAtmoWorld ? 0.016 : 0.0001;
+        if (localT >= 0.25 && !firedSfxEvents.has('airlock-deploy')) {
+          firedSfxEvents.add('airlock-deploy');
+          spaceAudio.triggerAirlockDeploy();
+        }
+        if (localT >= 0.75) {
+          triggerVoiceCue(
+            `disembark-${planetId}`,
+            `Airlock depressurized, ramp deployed. Crew stepping out onto ${planet.name} to anchor the expedition flag.`,
+            { queue: true }
+          );
+        }
+
+        audioWindLevel = isAtmoWorld ? 0.24 : 0;
+        audioCabinLevel = 0.08;
       }
 
       terrainBundle.updateSkyEffects(elapsed, dt);
 
-      if (audioCtx && thrusterGain && windGain && !mutedRef.current) {
-        const ct = audioCtx.currentTime;
-        thrusterGain.gain.setTargetAtTime(targetThrustAudio, ct, 0.08);
-        windGain.gain.setTargetAtTime(targetWindAudio, ct, 0.08);
-      } else if (audioCtx && thrusterGain && windGain && mutedRef.current) {
-        const ct = audioCtx.currentTime;
-        thrusterGain.gain.setTargetAtTime(0.0001, ct, 0.05);
-        windGain.gain.setTargetAtTime(0.0001, ct, 0.05);
-      }
+      spaceAudio.update({
+        stage: curStage,
+        muted: mutedRef.current,
+        thrustLevel: audioThrustLevel,
+        crackleLevel: audioCrackleLevel,
+        loxVentLevel: audioLoxLevel,
+        plasmaLevel: audioPlasmaLevel,
+        windLevel: audioWindLevel,
+        cabinHumLevel: audioCabinLevel,
+        maxQLevel: audioMaxQLevel,
+      });
 
       renderer.render(scene, camera);
 
@@ -2052,16 +2117,7 @@ export default function MissionLaunchScene({
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
       resizeObserver.disconnect();
-
-      if (audioCtx) {
-        try {
-          noiseSrc?.stop();
-          bassOsc?.stop();
-          if (audioCtx.state !== 'closed') audioCtx.close().catch(() => {});
-        } catch {
-          // Ignore audio cleanup errors
-        }
-      }
+      spaceAudio.dispose();
 
       terrainBundle.dispose();
       scene.traverse((obj) => {
@@ -2112,20 +2168,43 @@ export default function MissionLaunchScene({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => {
-          stopNasaSpeech();
-          onComplete({
-            siteLabel: selectedFlagPreset.siteLabel,
-            outpostX: selectedFlagPreset.outpostX,
-            outpostZ: selectedFlagPreset.outpostZ,
-          });
-        }}
-        className="fixed top-4 right-5 z-30 bg-transparent border-0 shadow-none p-1 text-xs font-mono tracking-wider text-white/25 hover:text-white/90 focus-visible:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/60 transition-opacity cursor-pointer"
-      >
-        Skip
-      </button>
+      {commsCaption && (
+        <div className="pointer-events-none fixed bottom-6 left-6 z-20 max-w-xl">
+          <div className="text-[10px] font-mono uppercase tracking-[0.26em] text-sky-400/85 mb-1">
+            NASA CAPCOM · {stage === 'boarding' ? 'LAUNCH CONTROL' : stage === 'transit' ? 'DEEP SPACE NETWORK' : stage === 'landing' ? 'ENTRY & DESCENT' : 'SURFACE EVA'}
+          </div>
+          <p className="text-xs sm:text-sm text-slate-100/90 leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+            {commsCaption}
+          </p>
+        </div>
+      )}
+
+      <div className="fixed top-4 right-5 z-30 flex items-center gap-4">
+        {onToggleAudio && (
+          <button
+            type="button"
+            onClick={onToggleAudio}
+            aria-label={isAudioMuted ? 'Unmute Audio' : 'Mute Audio'}
+            className="bg-transparent border-0 shadow-none p-1 text-white/45 hover:text-white transition-opacity cursor-pointer"
+          >
+            {isAudioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            stopNasaSpeech();
+            onComplete({
+              siteLabel: selectedFlagPreset.siteLabel,
+              outpostX: selectedFlagPreset.outpostX,
+              outpostZ: selectedFlagPreset.outpostZ,
+            });
+          }}
+          className="bg-transparent border-0 shadow-none p-1 text-xs font-mono tracking-wider text-white/25 hover:text-white/90 focus-visible:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/60 transition-opacity cursor-pointer"
+        >
+          Skip
+        </button>
+      </div>
     </div>
   );
 }

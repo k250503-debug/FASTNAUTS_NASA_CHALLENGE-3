@@ -32,6 +32,7 @@ import OutpostBuilderScene3D, {
   BUILDER_PAD_CELL_SLOTS,
   renderAllModuleThumbnails,
 } from '../three/OutpostBuilderScene3D';
+import PlanetaryBackdrop3D from '../three/PlanetaryBackdrop3D';
 import type { BuildingTypeId, MissionConfig, PlacedBuilding } from '../types';
 
 export const BUILDING_ICONS: Record<BuildingTypeId, LucideIcon> = {
@@ -338,7 +339,9 @@ export default function BaseBuilder({
   }, [placedBuildings, planet.solarEfficiency, difficulty.consumptionMultiplier]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#06080D] text-slate-100">
+    <div className="relative min-h-screen flex flex-col text-slate-100">
+      <PlanetaryBackdrop3D planetId={planet.id} mode="orbit" />
+
       <Navbar
         showLandingNav={false}
         onGoHome={onGoHome}
@@ -346,13 +349,13 @@ export default function BaseBuilder({
       />
 
       {/* Top Planet & Budget Header */}
-      <div className="border-b border-slate-800/90 bg-[#0A0F1A]">
+      <div className="border-b border-white/10 astra-glass-dock relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex flex-col gap-1">
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white w-fit transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-slate-300 hover:text-white w-fit transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Change Planet
             </button>
@@ -360,7 +363,7 @@ export default function BaseBuilder({
               <h1 className="font-display text-2xl sm:text-3xl font-bold text-white">
                 {planet.name} Outpost Construction
               </h1>
-              <span className="text-xs font-mono text-sky-400 tabular-nums">
+              <span className="text-xs font-mono text-cyan-300 tabular-nums">
                 {planet.location} · Gravity {planet.gravityMs2} m/s² · Solar{' '}
                 {Math.round(planet.solarEfficiency * 100)}%
               </span>
@@ -368,17 +371,17 @@ export default function BaseBuilder({
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
-            <div className="min-w-[230px] rounded-xl bg-[#070A12] border border-slate-800 px-4 py-2.5">
-              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1">
+            <div className="min-w-[230px] rounded-xl astra-glass-subtle px-4 py-2.5">
+              <div className="flex items-center justify-between text-[11px] font-mono text-slate-300 mb-1">
                 <span>REMAINING BUDGET</span>
                 <span className="tabular-nums text-white font-bold">
                   {remainingBudget.toLocaleString()} / {totalBudget.toLocaleString()} CR
                 </span>
               </div>
-              <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden">
+              <div className="w-full h-2 rounded-full bg-slate-950/60 overflow-hidden">
                 <div
                   className={`h-full transition-all duration-300 ${
-                    remainingBudget < 160 ? 'bg-amber-400' : 'bg-sky-400'
+                    remainingBudget < 160 ? 'bg-amber-400' : 'bg-cyan-400'
                   }`}
                   style={{ width: `${Math.max(0, (remainingBudget / totalBudget) * 100)}%` }}
                 />
@@ -389,23 +392,25 @@ export default function BaseBuilder({
       </div>
 
       {/* Main Content: Live 3D Outpost + Full 14-Module Catalog + Right Budget Summary */}
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start relative z-10">
         {/* Left/Center (8 cols): Live 3D Construction Stage + Module Selector */}
         <div className="lg:col-span-8 flex flex-col gap-4">
           {/* Interactive 3D Planetary Construction Viewport */}
-          <section className="relative h-[300px] sm:h-[340px] rounded-2xl overflow-hidden border border-slate-800 bg-[#04070D]">
-            <OutpostBuilderScene3D
-              planetId={planet.id}
-              buildings={placedBuildings}
-              focusedTypeId={focusedTypeId}
-            />
-            <div className="pointer-events-none absolute top-3 left-4 right-4 flex items-center justify-between gap-2">
-              <div className="px-3 py-1.5 rounded-lg bg-[#070B14]/90 border border-slate-700/80 text-xs font-mono text-slate-200">
-                Live 3D Base · <strong className="text-sky-300">{planet.name}</strong> (
-                {placedBuildings.length}/{BUILDER_PAD_CELL_SLOTS.length} Pads Occupied)
-              </div>
-              <div className="hidden sm:block text-[11px] font-mono text-slate-300 bg-[#070B14]/80 px-2.5 py-1 rounded-md border border-slate-800">
-                Drag to Orbit · Scroll to Zoom
+          <section className="relative h-[300px] sm:h-[340px] rounded-2xl overflow-hidden astra-glass p-1">
+            <div className="relative w-full h-full rounded-xl overflow-hidden bg-slate-950/40">
+              <OutpostBuilderScene3D
+                planetId={planet.id}
+                buildings={placedBuildings}
+                focusedTypeId={focusedTypeId}
+              />
+              <div className="pointer-events-none absolute top-3 left-4 right-4 flex items-center justify-between gap-2">
+                <div className="px-3 py-1.5 rounded-lg astra-glass-pill border border-cyan-300/25 text-xs font-mono text-slate-100">
+                  Live 3D Base · <strong className="text-cyan-300">{planet.name}</strong> (
+                  {placedBuildings.length}/{BUILDER_PAD_CELL_SLOTS.length} Pads Occupied)
+                </div>
+                <div className="hidden sm:block text-[11px] font-mono text-slate-200 astra-glass-pill px-2.5 py-1 rounded-md border border-white/15">
+                  Drag to Orbit · Scroll to Zoom
+                </div>
               </div>
             </div>
           </section>
@@ -421,8 +426,8 @@ export default function BaseBuilder({
                   onClick={() => setCategoryFilter(tab.id)}
                   className={`px-3.5 py-1.5 rounded-lg border text-xs font-mono transition-colors ${
                     active
-                      ? 'bg-sky-500/20 border-sky-400 text-sky-200 font-semibold'
-                      : 'bg-[#0C121E] border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      ? 'bg-cyan-500/22 border-cyan-400 text-cyan-200 font-semibold'
+                      : 'astra-glass-subtle text-slate-300 hover:text-white hover:border-cyan-300/40'
                   }`}
                 >
                   {tab.label}
@@ -449,13 +454,13 @@ export default function BaseBuilder({
                 <div
                   key={def.id}
                   onMouseEnter={() => setFocusedTypeId(def.id)}
-                  className={`rounded-2xl bg-[#0C121E] border transition-colors p-4 flex flex-col justify-between gap-3 ${
-                    count > 0 ? accent.border : 'border-slate-800 hover:border-slate-700'
+                  className={`rounded-2xl astra-glass transition-colors p-4 flex flex-col justify-between gap-3 ${
+                    count > 0 ? accent.border : 'hover:border-cyan-400/40'
                   }`}
                 >
                   <div>
                     {/* 3D Model Preview Frame */}
-                    <div className="relative h-28 rounded-xl bg-gradient-to-b from-[#070B14] to-[#0E1626] border border-slate-800/90 overflow-hidden mb-3 flex items-center justify-center">
+                    <div className="relative h-28 rounded-xl astra-glass-subtle overflow-hidden mb-3 flex items-center justify-center">
                       {thumbUrl ? (
                         <img
                           src={thumbUrl}
@@ -471,39 +476,39 @@ export default function BaseBuilder({
                       )}
 
                       <div className="absolute top-2 left-2.5 flex items-center gap-1.5">
-                        <span className="text-[11px] font-mono font-bold text-white bg-[#070B14]/90 border border-slate-700 px-2 py-0.5 rounded">
+                        <span className="text-[11px] font-mono font-bold text-white astra-glass-pill border border-white/20 px-2 py-0.5 rounded">
                           {def.cost} CR
                         </span>
                         {def.required && (
-                          <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 bg-amber-950/85 border border-amber-500/40 px-2 py-0.5 rounded">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 bg-amber-950/75 border border-amber-400/45 px-2 py-0.5 rounded">
                             Required
                           </span>
                         )}
                       </div>
 
-                      <div className="absolute top-2 right-2.5 text-[11px] font-mono tabular-nums text-slate-200 bg-[#070B14]/90 border border-slate-700 px-2 py-0.5 rounded">
+                      <div className="absolute top-2 right-2.5 text-[11px] font-mono tabular-nums text-slate-100 astra-glass-pill border border-white/20 px-2 py-0.5 rounded">
                         Built: {count}/{def.maxPerBase}
                       </div>
                     </div>
 
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div>
-                        <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-slate-300">
                           {def.category}
                         </div>
                         <h2 className="font-display text-base font-bold text-white">{def.name}</h2>
                       </div>
                       <Icon className={`w-4 h-4 shrink-0 mt-1 ${accent.text}`} />
                     </div>
-                    <p className="text-xs text-slate-300 leading-relaxed mb-2.5">{def.benefit}</p>
+                    <p className="text-xs text-slate-200 leading-relaxed mb-2.5">{def.benefit}</p>
 
                     <div className="space-y-1.5 text-[11px] font-mono">
                       {quickYield && (
-                        <div className="px-2.5 py-1.5 rounded-lg bg-[#070A12] border border-slate-800 text-emerald-300">
+                        <div className="px-2.5 py-1.5 rounded-lg astra-glass-subtle text-emerald-300">
                           {quickYield}
                         </div>
                       )}
-                      <div className="px-2.5 py-1.5 rounded-lg bg-[#070A12] border border-slate-800 text-amber-300/90">
+                      <div className="px-2.5 py-1.5 rounded-lg astra-glass-subtle text-amber-300/95">
                         Trade-off: {def.tradeOff}
                       </div>
                     </div>
@@ -517,8 +522,8 @@ export default function BaseBuilder({
                       onClick={() => handleAddModule(def.id)}
                       className={`flex-1 py-2.5 px-3 rounded-xl font-display font-bold text-xs flex items-center justify-center gap-1.5 transition-colors ${
                         canAdd
-                          ? 'bg-sky-500 hover:bg-sky-400 text-slate-950'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          ? 'bg-cyan-400 hover:bg-cyan-300 text-slate-950'
+                          : 'bg-slate-800/60 text-slate-500 cursor-not-allowed'
                       }`}
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -534,7 +539,7 @@ export default function BaseBuilder({
                         type="button"
                         onClick={() => handleRemoveModule(def.id)}
                         aria-label={`Remove ${def.name}`}
-                        className="py-2.5 px-3 rounded-xl bg-[#070A12] hover:bg-rose-950/50 border border-slate-700 hover:border-rose-500/50 text-xs font-mono text-slate-300 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                        className="py-2.5 px-3 rounded-xl astra-glass-subtle hover:bg-rose-950/50 hover:border-rose-400/50 text-xs font-mono text-slate-200 hover:text-rose-200 flex items-center gap-1 transition-colors"
                       >
                         <Minus className="w-3.5 h-3.5" /> Remove
                       </button>
@@ -547,10 +552,10 @@ export default function BaseBuilder({
         </div>
 
         {/* Right Side (4 cols): Compact Mission Budget Summary & Continue CTA */}
-        <aside className="lg:col-span-4 rounded-2xl bg-[#0C121E] border border-slate-800 p-5 flex flex-col gap-4 lg:sticky lg:top-6">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <aside className="lg:col-span-4 rounded-2xl astra-glass p-5 flex flex-col gap-4 lg:sticky lg:top-20">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <div>
-              <div className="text-[11px] font-mono uppercase tracking-wider text-sky-400">
+              <div className="text-[11px] font-mono uppercase tracking-wider text-cyan-400">
                 Mission Budget Summary
               </div>
               <h2 className="font-display text-xl font-bold text-white">Base Allocation Plan</h2>
@@ -560,7 +565,7 @@ export default function BaseBuilder({
                 type="button"
                 onClick={handleLoadBalancedStarter}
                 title="Load recommended outpost with shelter & life support"
-                className="px-2.5 py-1.5 rounded-lg bg-[#070A12] hover:bg-slate-800 border border-slate-700 text-[11px] font-mono text-sky-300 flex items-center gap-1 transition-colors"
+                className="px-2.5 py-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-[11px] font-mono text-cyan-300 flex items-center gap-1 transition-colors"
               >
                 <Sparkles className="w-3 h-3" /> Preset
               </button>
@@ -568,7 +573,7 @@ export default function BaseBuilder({
                 type="button"
                 onClick={() => setPlacedBuildings([])}
                 title="Clear all modules"
-                className="p-1.5 rounded-lg bg-[#070A12] hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition-colors"
+                className="p-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-slate-300 hover:text-white transition-colors"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
@@ -583,26 +588,26 @@ export default function BaseBuilder({
               </span>
             </div>
 
-            <div className="rounded-xl bg-[#070A12] border border-slate-800 p-3 space-y-2 max-h-52 overflow-y-auto">
+            <div className="rounded-xl astra-glass-subtle p-3 space-y-2 max-h-52 overflow-y-auto">
               {deployedGroups.length === 0 ? (
-                <div className="text-slate-500 text-center py-2">
+                <div className="text-slate-400 text-center py-2">
                   No modules placed yet. Add structures on the left.
                 </div>
               ) : (
                 deployedGroups.map(({ def, count }) => (
                   <div key={def.id} className="flex items-center justify-between gap-2">
-                    <span className="text-slate-200 truncate">
+                    <span className="text-slate-100 truncate">
                       {def.shortName} ×{count}
                     </span>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="tabular-nums font-semibold text-sky-300">
+                      <span className="tabular-nums font-semibold text-cyan-300">
                         {count * def.cost} CR
                       </span>
                       <button
                         type="button"
                         onClick={() => handleRemoveModule(def.id)}
                         aria-label={`Remove one ${def.shortName}`}
-                        className="p-0.5 rounded border border-slate-700 hover:border-rose-400 text-slate-400 hover:text-rose-300"
+                        className="p-0.5 rounded border border-white/20 hover:border-rose-400 text-slate-300 hover:text-rose-300"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
@@ -613,7 +618,7 @@ export default function BaseBuilder({
             </div>
 
             <div className="flex justify-between items-center pt-1 text-sm">
-              <span className="text-slate-300 font-semibold">Remaining Reserve</span>
+              <span className="text-slate-200 font-semibold">Remaining Reserve</span>
               <span
                 className={`font-bold tabular-nums text-lg ${
                   remainingBudget > 0 ? 'text-emerald-400' : 'text-amber-300'
@@ -625,19 +630,19 @@ export default function BaseBuilder({
           </div>
 
           {/* Engineering Net Balance Preview */}
-          <div className="rounded-xl bg-[#070A12] border border-slate-800 p-3.5 space-y-2">
-            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+          <div className="rounded-xl astra-glass-subtle p-3.5 space-y-2">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-300">
               Projected Daily System Balance
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
-              <div className="p-2 rounded-lg bg-[#0C121E] border border-slate-800/80">
-                <span className="text-slate-400 block text-[10px]">Net Power</span>
+              <div className="p-2 rounded-lg astra-glass-pill border border-white/10">
+                <span className="text-slate-300 block text-[10px]">Net Power</span>
                 <strong className={balance.netPower >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
                   {balance.netPower >= 0 ? `+${balance.netPower}` : balance.netPower} kWh
                 </strong>
               </div>
-              <div className="p-2 rounded-lg bg-[#0C121E] border border-slate-800/80">
-                <span className="text-slate-400 block text-[10px]">Rad Shield</span>
+              <div className="p-2 rounded-lg astra-glass-pill border border-white/10">
+                <span className="text-slate-300 block text-[10px]">Rad Shield</span>
                 <strong
                   className={
                     balance.shielding >= 60 ? 'text-emerald-400' : 'text-amber-300'
@@ -646,26 +651,26 @@ export default function BaseBuilder({
                   {balance.shielding}%
                 </strong>
               </div>
-              <div className="p-2 rounded-lg bg-[#0C121E] border border-slate-800/80">
-                <span className="text-slate-400 block text-[10px]">Net Oxygen</span>
-                <strong className={balance.netO2 >= -4 ? 'text-sky-300' : 'text-amber-400'}>
+              <div className="p-2 rounded-lg astra-glass-pill border border-white/10">
+                <span className="text-slate-300 block text-[10px]">Net Oxygen</span>
+                <strong className={balance.netO2 >= -4 ? 'text-cyan-300' : 'text-amber-400'}>
                   {balance.netO2 >= 0 ? `+${balance.netO2}` : balance.netO2}/d
                 </strong>
               </div>
-              <div className="p-2 rounded-lg bg-[#0C121E] border border-slate-800/80">
-                <span className="text-slate-400 block text-[10px]">Net Water</span>
+              <div className="p-2 rounded-lg astra-glass-pill border border-white/10">
+                <span className="text-slate-300 block text-[10px]">Net Water</span>
                 <strong className={balance.netH2O >= -4 ? 'text-cyan-300' : 'text-amber-400'}>
                   {balance.netH2O >= 0 ? `+${balance.netH2O}` : balance.netH2O}/d
                 </strong>
               </div>
-              <div className="p-2 rounded-lg bg-[#0C121E] border border-slate-800/80">
-                <span className="text-slate-400 block text-[10px]">Net Food</span>
+              <div className="p-2 rounded-lg astra-glass-pill border border-white/10">
+                <span className="text-slate-300 block text-[10px]">Net Food</span>
                 <strong className={balance.netFood >= -2 ? 'text-emerald-300' : 'text-amber-400'}>
                   {balance.netFood >= 0 ? `+${balance.netFood}` : balance.netFood}/d
                 </strong>
               </div>
-              <div className="p-2 rounded-lg bg-[#0C121E] border border-slate-800/80">
-                <span className="text-slate-400 block text-[10px]">Battery Cap</span>
+              <div className="p-2 rounded-lg astra-glass-pill border border-white/10">
+                <span className="text-slate-300 block text-[10px]">Battery Cap</span>
                 <strong className="text-amber-300">{balance.batteryMax} kWh</strong>
               </div>
             </div>
@@ -705,8 +710,8 @@ export default function BaseBuilder({
             onClick={() => onContinueToBriefing(placedBuildings, remainingBudget)}
             className={`w-full py-3.5 px-5 rounded-xl font-display font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
               canProceed
-                ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
-                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                ? 'bg-emerald-400 hover:bg-emerald-300 text-slate-950 shadow-[0_0_24px_rgba(52,211,153,0.28)]'
+                : 'bg-slate-800/60 text-slate-500 cursor-not-allowed'
             }`}
           >
             Continue to Mission Briefing

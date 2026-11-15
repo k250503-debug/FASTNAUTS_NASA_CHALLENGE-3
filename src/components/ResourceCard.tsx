@@ -57,10 +57,10 @@ export default function ResourceCard({
     <button
       type="button"
       onClick={onClick}
-      className="text-left p-4 rounded-xl bg-space-900 border border-slate-800 hover:border-sky-500/60 transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+      className="text-left p-4 rounded-xl astra-glass hover:border-cyan-400/60 transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
     >
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-xs font-medium text-slate-400 group-hover:text-slate-200 truncate">
+        <span className="text-xs font-medium text-slate-300 group-hover:text-white truncate">
           {title}
         </span>
         <Icon className={`w-4 h-4 shrink-0 ${tone.icon}`} />
@@ -80,7 +80,7 @@ export default function ResourceCard({
         </span>
       </div>
 
-      <div className="w-full h-1.5 rounded-full bg-space-950 overflow-hidden mb-2">
+      <div className="w-full h-1.5 rounded-full bg-slate-950/60 border border-white/10 overflow-hidden mb-2">
         <div
           className={`h-full rounded-full transition-all duration-300 ${tone.bar}`}
           style={{ width: `${Math.max(3, Math.min(100, percent))}%` }}
@@ -88,7 +88,7 @@ export default function ResourceCard({
       </div>
 
       {deltaText && (
-        <div className="font-mono tabular-nums text-[11px] text-slate-400 truncate">
+        <div className="font-mono tabular-nums text-[11px] text-slate-300 truncate">
           {deltaText}
         </div>
       )}

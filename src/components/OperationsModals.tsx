@@ -137,13 +137,13 @@ export default function OperationsModals({
   const dustyBuildings = state.buildings.filter((b) => (b.dustPct || 0) >= 18);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/82 flex items-center justify-center p-4">
-      <div className="max-w-3xl w-full rounded-xl bg-space-900 border border-slate-700 p-6 relative max-h-[88vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 z-50 astra-glass-backdrop flex items-center justify-center p-4">
+      <div className="max-w-3xl w-full rounded-xl astra-glass-modal p-6 relative max-h-[88vh] overflow-y-auto shadow-2xl">
         <button
           type="button"
           onClick={onClose}
           aria-label="Close panel"
-          className="absolute top-4 right-4 text-slate-400 hover:text-white"
+          className="absolute top-4 right-4 text-slate-300 hover:text-white"
         >
           <X className="w-5 h-5" />
         </button>
@@ -158,33 +158,33 @@ export default function OperationsModals({
               <h3 className="font-display text-2xl font-bold text-white">
                 Outpost Fuel Reserves &amp; ISRU Transfer
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-300 mt-0.5">
                 Opening this panel performs no automatic tasks. Choose an explicit propellant
                 operation below.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
-              <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400 mb-1">Base Propellant Reserve</div>
+              <div className="p-3.5 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300 mb-1">Base Propellant Reserve</div>
                 <div className="text-xl font-bold text-white">
                   {state.fuel.current} / {state.fuel.max} t
                 </div>
               </div>
-              <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400 mb-1">Starship Main Tank</div>
+              <div className="p-3.5 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300 mb-1">Starship Main Tank</div>
                 <div className="text-xl font-bold text-emerald-400">{state.fuel.shipTankPct}%</div>
               </div>
-              <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400 mb-1">ISRU Synthesis Rate</div>
-                <div className="text-xl font-bold text-sky-400">
+              <div className="p-3.5 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300 mb-1">ISRU Synthesis Rate</div>
+                <div className="text-xl font-bold text-cyan-300">
                   +{state.lastRates.fuelProd} t/day
                 </div>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 text-xs text-slate-300">
-              <strong className="text-sky-300">Last Propellant Log:</strong>{' '}
+            <div className="p-3.5 rounded-lg astra-glass-subtle text-xs text-slate-200">
+              <strong className="text-cyan-300">Last Propellant Log:</strong>{' '}
               {state.fuel.lastActionNote}
             </div>
 
@@ -195,14 +195,14 @@ export default function OperationsModals({
                 onClick={onSynthesizeFuel}
                 className={`p-4 rounded-lg border text-left transition-colors ${
                   state.resources.water.current >= 8
-                    ? 'bg-space-950 border-sky-500/50 hover:border-sky-400'
-                    : 'bg-space-950/50 border-slate-800 opacity-50 cursor-not-allowed'
+                    ? 'astra-glass-subtle border-cyan-400/50 hover:border-cyan-300'
+                    : 'astra-glass-subtle opacity-50 cursor-not-allowed'
                 }`}
               >
                 <div className="font-display font-bold text-sm text-white mb-1">
                   Run Sabatier ISRU Synthesis (+18 t Fuel)
                 </div>
-                <div className="text-xs text-slate-400">
+                <div className="text-xs text-slate-300">
                   Electrolyzes -6 Water &amp; converts atmospheric/oxide feedstock into Methalox.
                 </div>
               </button>
@@ -214,20 +214,20 @@ export default function OperationsModals({
                   onClick={() => setConfirmRefuel(true)}
                   className={`p-4 rounded-lg border text-left transition-colors ${
                     state.fuel.current >= 15 && state.fuel.shipTankPct < 100
-                      ? 'bg-space-950 border-emerald-500/50 hover:border-emerald-400'
-                      : 'bg-space-950/50 border-slate-800 opacity-50 cursor-not-allowed'
+                      ? 'astra-glass-subtle border-emerald-400/50 hover:border-emerald-300'
+                      : 'astra-glass-subtle opacity-50 cursor-not-allowed'
                   }`}
                 >
                   <div className="font-display font-bold text-sm text-white mb-1">
                     Transfer Fuel to NASA Starship (+25% Tank)
                   </div>
-                  <div className="text-xs text-slate-400">
+                  <div className="text-xs text-slate-300">
                     Pumps -15 t from base reserve to Starship tanks (requires confirmation).
                   </div>
                 </button>
               ) : (
-                <div className="p-4 rounded-lg bg-emerald-950/40 border border-emerald-400 flex flex-col justify-between gap-2">
-                  <div className="text-xs text-emerald-200 font-semibold">
+                <div className="p-4 rounded-lg astra-glass-success flex flex-col justify-between gap-2">
+                  <div className="text-xs text-emerald-100 font-semibold">
                     Confirm Propellant Transfer (-15 t Reserve → +25% Starship Tank)?
                   </div>
                   <div className="flex items-center gap-2">
@@ -248,7 +248,7 @@ export default function OperationsModals({
                     <button
                       type="button"
                       onClick={() => setConfirmRefuel(false)}
-                      className="px-3 py-1.5 rounded bg-space-950 border border-slate-700 text-xs text-slate-300"
+                      className="px-3 py-1.5 rounded astra-glass-subtle text-xs text-slate-200"
                     >
                       Cancel
                     </button>
@@ -271,7 +271,7 @@ export default function OperationsModals({
                   Astronaut Health, Diagnosis &amp; Treatment
                 </h3>
               </div>
-              <div className="px-3 py-1.5 rounded-lg bg-space-950 border border-slate-800 text-xs font-mono">
+              <div className="px-3 py-1.5 rounded-lg astra-glass-subtle text-xs font-mono">
                 Medkits: <strong className="text-emerald-400">{state.resources.medSupplies}</strong>{' '}
                 · Med Bay:{' '}
                 <strong className={hasMedBay ? 'text-emerald-400' : 'text-amber-400'}>
@@ -281,7 +281,7 @@ export default function OperationsModals({
             </div>
 
             {!hasMedBay && (
-              <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200">
+              <div className="p-3 rounded-lg astra-glass-warn text-xs text-amber-100">
                 Tip: Build a <strong>Medical Bay</strong> module for automated passive fatigue
                 recovery and faster medical treatments.
               </div>
@@ -296,8 +296,8 @@ export default function OperationsModals({
                     key={astro.id}
                     className={`p-3.5 rounded-lg border text-xs space-y-2 ${
                       cond
-                        ? 'bg-rose-950/25 border-rose-500/60'
-                        : 'bg-space-950 border-slate-800'
+                        ? 'astra-glass-alert'
+                        : 'astra-glass-subtle'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -323,14 +323,14 @@ export default function OperationsModals({
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-1.5 font-mono text-[11px] text-slate-300">
-                      <div className="p-1.5 rounded bg-space-900">
-                        Hydration: <strong className="text-sky-300">{v.hydrationPct}%</strong>
+                    <div className="grid grid-cols-3 gap-1.5 font-mono text-[11px] text-slate-200">
+                      <div className="p-1.5 rounded bg-slate-950/45 border border-white/10">
+                        Hydration: <strong className="text-cyan-300">{v.hydrationPct}%</strong>
                       </div>
-                      <div className="p-1.5 rounded bg-space-900">
+                      <div className="p-1.5 rounded bg-slate-950/45 border border-white/10">
                         Fatigue: <strong className="text-amber-300">{v.fatiguePct}%</strong>
                       </div>
-                      <div className="p-1.5 rounded bg-space-900">
+                      <div className="p-1.5 rounded bg-slate-950/45 border border-white/10">
                         Rad: <strong className="text-rose-300">{v.radiationPct}%</strong>
                       </div>
                     </div>
@@ -397,8 +397,8 @@ export default function OperationsModals({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono">
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">Signal Strength</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">Signal Strength</div>
                 <div
                   className={`text-lg font-bold ${
                     state.comms.signalStrengthPct >= 65
@@ -409,8 +409,8 @@ export default function OperationsModals({
                   {state.comms.signalStrengthPct}%
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">Comms Window</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">Comms Window</div>
                 <div
                   className={`text-lg font-bold ${
                     state.comms.windowOpen ? 'text-emerald-400' : 'text-amber-400'
@@ -419,23 +419,23 @@ export default function OperationsModals({
                   {state.comms.windowOpen ? 'OPEN' : 'OCCULTED'}
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">Earth Visibility</div>
-                <div className="text-lg font-bold text-sky-300">
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">Earth Visibility</div>
+                <div className="text-lg font-bold text-cyan-300">
                   {state.comms.earthVisibilityPct}%
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">Range / Latency</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">Range / Latency</div>
                 <div className="text-sm font-bold text-white">
                   {state.comms.rangeKm.toLocaleString()} km
                 </div>
-                <div className="text-[10px] text-slate-400">{state.comms.latencySec}s one-way</div>
+                <div className="text-[10px] text-slate-300">{state.comms.latencySec}s one-way</div>
               </div>
             </div>
 
             {state.comms.fault ? (
-              <div className="p-4 rounded-xl bg-rose-950/35 border border-rose-500/60 space-y-3">
+              <div className="p-4 rounded-xl astra-glass-alert space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="font-display font-bold text-base text-rose-200 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-rose-400" />
@@ -525,7 +525,7 @@ export default function OperationsModals({
                 })()}
               </div>
             ) : (
-              <div className="p-4 rounded-lg bg-emerald-950/30 border border-emerald-500/40 text-xs text-emerald-200 flex items-center justify-between gap-3">
+              <div className="p-4 rounded-lg astra-glass-success text-xs text-emerald-100 flex items-center justify-between gap-3">
                 <span>
                   ● Deep-Space Comms Array operational.{' '}
                   {hasCommsArray
@@ -560,7 +560,7 @@ export default function OperationsModals({
                   Outpost Logistics Inventory
                 </h3>
               </div>
-              <div className="text-xs font-mono text-slate-300">
+              <div className="text-xs font-mono text-slate-200">
                 Workshop:{' '}
                 <strong className={hasWorkshop ? 'text-emerald-400' : 'text-amber-400'}>
                   {hasWorkshop ? 'Online' : 'Build to Craft'}
@@ -576,10 +576,10 @@ export default function OperationsModals({
                 return (
                   <div
                     key={matId}
-                    className="p-3 rounded-lg bg-space-950 border border-slate-800 flex items-center justify-between gap-2"
+                    className="p-3 rounded-lg astra-glass-subtle flex items-center justify-between gap-2"
                   >
                     <div>
-                      <div className="text-slate-400 text-[11px]">{meta.name}</div>
+                      <div className="text-slate-300 text-[11px]">{meta.name}</div>
                       <div className={`font-mono font-bold text-base ${meta.colorClass}`}>
                         {state.materials[matId]} {meta.unit}
                       </div>
@@ -588,7 +588,7 @@ export default function OperationsModals({
                       type="button"
                       onClick={() => onRecycleScrap(matId)}
                       title="Recycle EVA scrap into raw materials (+2)"
-                      className="p-1.5 rounded bg-space-900 border border-slate-700 hover:border-sky-400 text-sky-300"
+                      className="p-1.5 rounded astra-glass-subtle hover:border-cyan-400 text-cyan-300"
                     >
                       <Recycle className="w-3.5 h-3.5" />
                     </button>
@@ -616,8 +616,8 @@ export default function OperationsModals({
                     key={part.id}
                     className={`p-3 rounded-lg border flex items-center justify-between gap-2 ${
                       low
-                        ? 'bg-amber-950/25 border-amber-500/60'
-                        : 'bg-space-950 border-slate-800'
+                        ? 'astra-glass-warn'
+                        : 'astra-glass-subtle'
                     }`}
                   >
                     <div className="min-w-0">
@@ -629,8 +629,8 @@ export default function OperationsModals({
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5 truncate">{part.purpose}</div>
-                      <div className="text-[10px] font-mono text-sky-300 mt-0.5">
+                      <div className="text-[11px] text-slate-300 mt-0.5 truncate">{part.purpose}</div>
+                      <div className="text-[10px] font-mono text-cyan-300 mt-0.5">
                         Craft: {matRecipe}
                       </div>
                     </div>
@@ -642,8 +642,8 @@ export default function OperationsModals({
                         onClick={() => onCraftPart(part.id)}
                         className={`px-2.5 py-1 rounded text-[11px] font-semibold ${
                           canCraft
-                            ? 'bg-sky-500 hover:bg-sky-400 text-slate-950'
-                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                            ? 'bg-cyan-400 hover:bg-cyan-300 text-slate-950'
+                            : 'bg-slate-800/70 text-slate-500 cursor-not-allowed'
                         }`}
                       >
                         Fabricate +2
@@ -655,13 +655,13 @@ export default function OperationsModals({
             </div>
 
             {/* Cargo Resupply Requests */}
-            <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 space-y-2">
+            <div className="p-3.5 rounded-lg astra-glass-subtle space-y-2">
               <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-sky-400 uppercase flex items-center gap-1.5">
+                <span className="text-cyan-300 uppercase flex items-center gap-1.5">
                   <Truck className="w-3.5 h-3.5" /> Request Earth Resupply Cargo (Arrives in{' '}
                   {planet.resupplyDays} days)
                 </span>
-                <span className="text-slate-400">
+                <span className="text-slate-300">
                   In Transit: {state.pendingResupply.length} pod(s)
                 </span>
               </div>
@@ -670,28 +670,28 @@ export default function OperationsModals({
                   type="button"
                   disabled={state.budget < 90}
                   onClick={() => onOrderResupply('spare_bundle')}
-                  className="p-2.5 rounded-lg bg-space-900 border border-slate-700 hover:border-sky-400 disabled:opacity-45 text-left"
+                  className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400 disabled:opacity-45 text-left"
                 >
                   <div className="font-bold text-white">Engineering Kit · 90 CR</div>
-                  <div className="text-[11px] text-slate-400">+3 Cables, Seals, Filters, Mech</div>
+                  <div className="text-[11px] text-slate-300">+3 Cables, Seals, Filters, Mech</div>
                 </button>
                 <button
                   type="button"
                   disabled={state.budget < 85}
                   onClick={() => onOrderResupply('med_bundle')}
-                  className="p-2.5 rounded-lg bg-space-900 border border-slate-700 hover:border-sky-400 disabled:opacity-45 text-left"
+                  className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400 disabled:opacity-45 text-left"
                 >
                   <div className="font-bold text-white">Medical &amp; Battery Pod · 85 CR</div>
-                  <div className="text-[11px] text-slate-400">+5 Medkits, +3 Batteries</div>
+                  <div className="text-[11px] text-slate-300">+5 Medkits, +3 Batteries</div>
                 </button>
                 <button
                   type="button"
                   disabled={state.budget < 95}
                   onClick={() => onOrderResupply('antenna_kit')}
-                  className="p-2.5 rounded-lg bg-space-900 border border-slate-700 hover:border-sky-400 disabled:opacity-45 text-left"
+                  className="p-2.5 rounded-lg astra-glass-subtle hover:border-cyan-400 disabled:opacity-45 text-left"
                 >
                   <div className="font-bold text-white">Avionics &amp; Antenna · 95 CR</div>
-                  <div className="text-[11px] text-slate-400">+2 Antenna, +2 Boards, +2 Tools</div>
+                  <div className="text-[11px] text-slate-300">+2 Antenna, +2 Boards, +2 Tools</div>
                 </button>
               </div>
             </div>
@@ -722,10 +722,10 @@ export default function OperationsModals({
 
             {/* Rover & Field Tools Condition */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 flex items-center justify-between gap-2">
+              <div className="p-3.5 rounded-lg astra-glass-subtle flex items-center justify-between gap-2">
                 <div>
                   <div className="font-semibold text-white">Autonomous Surface Rover</div>
-                  <div className="font-mono text-[11px] text-slate-400">
+                  <div className="font-mono text-[11px] text-slate-300">
                     Integrity: {state.rover.conditionPct}% · Battery: {state.rover.chargePct}% · Dust:{' '}
                     {state.rover.dustPct}%
                   </div>
@@ -735,7 +735,7 @@ export default function OperationsModals({
                     <button
                       type="button"
                       onClick={onRechargeRover}
-                      className="px-2.5 py-1 rounded bg-sky-500 text-slate-950 font-bold"
+                      className="px-2.5 py-1 rounded bg-cyan-400 text-slate-950 font-bold"
                     >
                       Charge
                     </button>
@@ -753,10 +753,10 @@ export default function OperationsModals({
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 flex items-center justify-between gap-2">
+              <div className="p-3.5 rounded-lg astra-glass-subtle flex items-center justify-between gap-2">
                 <div>
                   <div className="font-semibold text-white">EVA Toolkit &amp; Instrumentation</div>
-                  <div className="font-mono text-[11px] text-slate-400">
+                  <div className="font-mono text-[11px] text-slate-300">
                     Condition: {state.toolsConditionPct}% · Tool Stock:{' '}
                     {state.spareParts.repair_tools || 0}
                   </div>
@@ -768,7 +768,7 @@ export default function OperationsModals({
             </div>
 
             {damagedBuildings.length === 0 ? (
-              <div className="p-4 rounded-lg bg-emerald-950/30 border border-emerald-500/40 text-xs text-emerald-200 flex items-center gap-2">
+              <div className="p-4 rounded-lg astra-glass-success text-xs text-emerald-100 flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 All outpost modules have high structural integrity. Any dust accumulation above 18%
                 can be brushed off to preserve solar output.
@@ -785,7 +785,7 @@ export default function OperationsModals({
                   return (
                     <div
                       key={b.uid}
-                      className="p-4 rounded-lg bg-rose-950/25 border border-rose-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                      className="p-4 rounded-lg astra-glass-alert flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                     >
                       <div>
                         <div className="font-display font-bold text-sm text-white">
@@ -813,7 +813,7 @@ export default function OperationsModals({
                           <button
                             type="button"
                             onClick={() => onInspectBuildingDamage(b.uid)}
-                            className="px-3 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold"
+                            className="px-3 py-1.5 rounded bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold"
                           >
                             1. Inspect Damage
                           </button>
@@ -831,7 +831,7 @@ export default function OperationsModals({
                             className={`px-3 py-1.5 rounded font-bold ${
                               hasAllParts
                                 ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
-                                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                : 'bg-slate-800/70 text-slate-500 cursor-not-allowed'
                             }`}
                           >
                             2. Repair &amp; Calibrate
@@ -859,21 +859,21 @@ export default function OperationsModals({
             </div>
 
             <div className="grid grid-cols-3 gap-3 text-xs font-mono">
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">Dust / Ice Clog</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">Dust / Ice Clog</div>
                 <div className="text-xl font-bold text-amber-300">
                   {state.stormFlue.cloggedPct}%
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">Pressure</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">Pressure</div>
                 <div className="text-xl font-bold text-white">
                   {state.stormFlue.pressureKpa} kPa
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">Exhaust Temp</div>
-                <div className="text-xl font-bold text-sky-300">
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">Exhaust Temp</div>
+                <div className="text-xl font-bold text-cyan-300">
                   {state.stormFlue.exhaustTempC} °C
                 </div>
               </div>
@@ -883,7 +883,7 @@ export default function OperationsModals({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-lg bg-[#07090E] border border-slate-700 text-xs text-slate-300"
+                className="px-4 py-2 rounded-lg astra-glass-subtle text-xs text-slate-200 hover:border-cyan-400/50"
               >
                 Close
               </button>
@@ -904,7 +904,7 @@ export default function OperationsModals({
         {openModal === 'whatif' && (
           <div className="space-y-4">
             <div>
-              <div className="text-xs font-mono text-sky-400 uppercase flex items-center gap-1.5 mb-1">
+              <div className="text-xs font-mono text-cyan-300 uppercase flex items-center gap-1.5 mb-1">
                 <Sliders className="w-4 h-4" /> STEM Engineering What-If Predictor
               </div>
               <h3 className="font-display text-2xl font-bold text-white">
@@ -913,8 +913,8 @@ export default function OperationsModals({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400 mb-1">+Solar Arrays: {simSolar}</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300 mb-1">+Solar Arrays: {simSolar}</div>
                 <input
                   type="range"
                   min={0}
@@ -924,8 +924,8 @@ export default function OperationsModals({
                   className="w-full accent-amber-400"
                 />
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400 mb-1">+Greenhouses: {simGreenhouse}</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300 mb-1">+Greenhouses: {simGreenhouse}</div>
                 <input
                   type="range"
                   min={0}
@@ -935,8 +935,8 @@ export default function OperationsModals({
                   className="w-full accent-emerald-400"
                 />
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400 mb-1">+Recyclers: {simRecycler}</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300 mb-1">+Recyclers: {simRecycler}</div>
                 <input
                   type="range"
                   min={0}
@@ -946,8 +946,8 @@ export default function OperationsModals({
                   className="w-full accent-sky-400"
                 />
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400 mb-1">+Batteries: {simBattery}</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300 mb-1">+Batteries: {simBattery}</div>
                 <input
                   type="range"
                   min={0}
@@ -960,7 +960,7 @@ export default function OperationsModals({
             </div>
 
             <div className="flex items-center gap-2 text-xs font-mono">
-              <span className="text-slate-400">Horizon:</span>
+              <span className="text-slate-300">Horizon:</span>
               {([7, 14] as const).map((d) => (
                 <button
                   key={d}
@@ -968,8 +968,8 @@ export default function OperationsModals({
                   onClick={() => setSimDays(d)}
                   className={`px-3 py-1 rounded ${
                     simDays === d
-                      ? 'bg-sky-500 text-slate-950 font-bold'
-                      : 'bg-space-950 border border-slate-700 text-slate-300'
+                      ? 'bg-cyan-400 text-slate-950 font-bold'
+                      : 'astra-glass-subtle text-slate-200'
                   }`}
                 >
                   {d} Days
@@ -978,30 +978,30 @@ export default function OperationsModals({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs font-mono">
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">End O₂</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">End O₂</div>
                 <div className="text-lg font-bold text-white">{whatIf.endOxygen}%</div>
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">End H₂O</div>
-                <div className="text-lg font-bold text-sky-300">{whatIf.endWater}%</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">End H₂O</div>
+                <div className="text-lg font-bold text-cyan-300">{whatIf.endWater}%</div>
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">End Food</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">End Food</div>
                 <div className="text-lg font-bold text-emerald-300">{whatIf.endFood}%</div>
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">End Power</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">End Power</div>
                 <div className="text-lg font-bold text-amber-300">{whatIf.endPowerPct}%</div>
               </div>
-              <div className="p-3 rounded-lg bg-space-950 border border-slate-800">
-                <div className="text-slate-400">Brownouts</div>
+              <div className="p-3 rounded-lg astra-glass-subtle">
+                <div className="text-slate-300">Brownouts</div>
                 <div className="text-lg font-bold text-rose-300">{whatIf.brownoutDays}d</div>
               </div>
             </div>
 
             {whatIf.criticalWarning && (
-              <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200">
+              <div className="p-3 rounded-lg astra-glass-warn text-xs text-amber-100">
                 <strong>Projection Alert:</strong> {whatIf.criticalWarning}
               </div>
             )}
@@ -1028,30 +1028,30 @@ export default function OperationsModals({
                     key={ach.id}
                     className={`p-3 rounded-lg border ${
                       earned
-                        ? 'bg-emerald-950/30 border-emerald-500/50'
-                        : 'bg-space-950 border-slate-800 opacity-65'
+                        ? 'astra-glass-success'
+                        : 'astra-glass-subtle opacity-65'
                     }`}
                   >
                     <div className="flex items-center justify-between font-semibold text-white">
                       <span>{ach.title}</span>
                       {earned && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                     </div>
-                    <div className="text-slate-400 mt-0.5">{ach.desc}</div>
+                    <div className="text-slate-300 mt-0.5">{ach.desc}</div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="pt-2 border-t border-slate-800">
-              <div className="text-xs font-mono text-sky-400 uppercase mb-2">
+            <div className="pt-2 border-t border-white/15">
+              <div className="text-xs font-mono text-cyan-300 uppercase mb-2">
                 Planetary Physics Reference
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono">
                 {PLANETS.map((p) => (
-                  <div key={p.id} className="p-2.5 rounded-lg bg-space-950 border border-slate-800">
+                  <div key={p.id} className="p-2.5 rounded-lg astra-glass-subtle">
                     <div className="font-bold text-white">{p.name}</div>
-                    <div className="text-sky-300">g = {p.gravityMs2} m/s²</div>
-                    <div className="text-slate-400">{p.atmosphereKpa} kPa</div>
+                    <div className="text-cyan-300">g = {p.gravityMs2} m/s²</div>
+                    <div className="text-slate-300">{p.atmosphereKpa} kPa</div>
                     <div className="text-amber-300">{p.tempRangeC}</div>
                   </div>
                 ))}
@@ -1089,13 +1089,13 @@ export default function OperationsModals({
                     onClick={() => setSelectedBuildType(b.id)}
                     className={`p-3 rounded-lg border text-left transition-colors flex items-center justify-between gap-2 ${
                       selectedBuildType === b.id
-                        ? 'bg-sky-500/15 border-sky-400'
-                        : 'bg-space-950 border-slate-800 hover:border-slate-600'
+                        ? 'bg-cyan-500/20 border-cyan-400'
+                        : 'astra-glass-subtle hover:border-cyan-400/50'
                     }`}
                   >
                     <div className="min-w-0">
                       <div className="font-semibold text-white truncate">{b.name}</div>
-                      <div className="text-[11px] text-slate-400 truncate">
+                      <div className="text-[11px] text-slate-300 truncate">
                         {count}/{b.maxPerBase} built · {b.category}
                       </div>
                     </div>
@@ -1120,8 +1120,8 @@ export default function OperationsModals({
                 state.budget >= def.cost &&
                 freeCells.length > 0;
               return (
-                <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-                  <div className="max-w-md text-slate-300">{def?.benefit}</div>
+                <div className="p-3.5 rounded-lg astra-glass-subtle flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="max-w-md text-slate-200">{def?.benefit}</div>
                   <button
                     type="button"
                     disabled={!canBuild}
@@ -1133,7 +1133,7 @@ export default function OperationsModals({
                     className={`px-4 py-2 rounded-lg font-display font-bold ${
                       canBuild
                         ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        : 'bg-slate-800/70 text-slate-500 cursor-not-allowed'
                     }`}
                   >
                     {freeCells.length === 0

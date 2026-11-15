@@ -817,9 +817,9 @@ export default function StormArrivalScene({
         )}
       </div>
 
-      <header className="absolute top-0 inset-x-0 z-20 bg-[#0F1623]/94 border-b border-amber-500/40 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <header className="absolute top-0 inset-x-0 z-20 astra-glass-warn border-b border-amber-400/40 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-[11px] font-mono uppercase tracking-wider text-amber-400 flex items-center gap-2">
+          <div className="text-[11px] font-mono uppercase tracking-wider text-amber-300 flex items-center gap-2">
             <CloudLightning className="w-3.5 h-3.5" />
             <span>
               Day {String(state.day).padStart(2, '0')} · {planet.name} Emergency Refuge
@@ -832,7 +832,7 @@ export default function StormArrivalScene({
           <button
             type="button"
             onClick={onToggleAudio}
-            className="px-3 py-2 rounded-lg bg-[#07090E] border border-slate-700 hover:border-amber-400 text-slate-200 font-mono text-xs flex items-center gap-1.5"
+            className="px-3 py-2 rounded-lg astra-glass-subtle hover:border-amber-400 text-slate-200 font-mono text-xs flex items-center gap-1.5 transition-colors"
           >
             {isAudioMuted ? (
               <VolumeX className="w-4 h-4 text-rose-400" />
@@ -862,7 +862,7 @@ export default function StormArrivalScene({
               stopNasaSpeech();
               onComplete();
             }}
-            className="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-display font-bold text-xs sm:text-sm flex items-center gap-1.5 whitespace-nowrap"
+            className="px-4 py-2 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-display font-bold text-xs sm:text-sm flex items-center gap-1.5 whitespace-nowrap transition-colors"
           >
             <SkipForward className="w-4 h-4" />
             Enter Outpost
@@ -870,10 +870,10 @@ export default function StormArrivalScene({
         </div>
       </header>
 
-      <footer className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[min(900px,95vw)] rounded-xl bg-[#0F1623]/94 border border-slate-800 px-4 py-3 flex flex-col gap-2.5">
-        <div className="w-full h-1.5 rounded-full bg-[#07090E] border border-slate-800 overflow-hidden">
+      <footer className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[min(900px,95vw)] rounded-xl astra-glass px-4 py-3 flex flex-col gap-2.5">
+        <div className="w-full h-1.5 rounded-full bg-slate-950/55 border border-white/15 overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-sky-400 via-amber-400 to-rose-500 transition-all duration-150"
+            className="h-full bg-gradient-to-r from-cyan-400 via-amber-400 to-rose-500 transition-all duration-150"
             style={{ width: `${progressPct}%` }}
           />
         </div>
@@ -884,11 +884,11 @@ export default function StormArrivalScene({
             {phaseText}
           </span>
 
-          <div className="flex flex-wrap items-center gap-3 text-slate-300 tabular-nums">
+          <div className="flex flex-wrap items-center gap-3 text-slate-200 tabular-nums">
             <span className="flex items-center gap-1 text-amber-300">
               <Wind className="w-3.5 h-3.5" /> {windKmh} km/h
             </span>
-            <span className="flex items-center gap-1 text-sky-300">
+            <span className="flex items-center gap-1 text-cyan-300">
               <Eye className="w-3.5 h-3.5" /> Vis {visibilityPct}%
             </span>
             <span className="flex items-center gap-1 text-rose-300">

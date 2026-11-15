@@ -72,7 +72,7 @@ export default function TaskAnimationView({
     <aside
       key={duty.key}
       aria-live="polite"
-      className={`absolute left-4 z-20 w-[min(340px,92vw)] rounded-xl bg-[#0F1623]/96 border border-slate-700 p-3.5 shadow-2xl transition-all ${
+      className={`absolute left-4 z-20 w-[min(340px,92vw)] rounded-xl astra-glass p-3.5 shadow-2xl transition-all ${
         hudHidden ? 'bottom-4' : 'bottom-[154px] sm:bottom-[142px]'
       }`}
       style={{ borderColor: astro.suitColor }}
@@ -112,9 +112,9 @@ export default function TaskAnimationView({
       </div>
 
       {/* CSS-Animated Hand Movement Stage + Circular Progress Ring */}
-      <div className="rounded-lg bg-[#07090E] border border-slate-800 px-3 py-2.5 mb-2.5 flex items-center gap-3">
+      <div className="rounded-lg astra-glass-subtle px-3 py-2.5 mb-2.5 flex items-center gap-3">
         {/* Animated Upper-Body Astronaut + Moving Left/Right Hands + Target Equipment */}
-        <div className="relative w-[132px] h-[74px] shrink-0 rounded-md bg-[#0B111C] border border-slate-800/80 overflow-hidden hud-grid">
+        <div className="relative w-[132px] h-[74px] shrink-0 rounded-md bg-slate-950/45 border border-cyan-300/20 overflow-hidden hud-grid">
           <svg
             viewBox="0 0 132 74"
             className="w-full h-full"
@@ -276,7 +276,7 @@ export default function TaskAnimationView({
       </div>
 
       {/* Smooth CSS Linear Progress Bar */}
-      <div className="w-full h-1.5 rounded-full bg-[#07090E] border border-slate-800 overflow-hidden">
+      <div className="w-full h-1.5 rounded-full bg-slate-950/60 border border-white/10 overflow-hidden">
         <div
           className="h-full w-full astra-task-progress-bar"
           style={

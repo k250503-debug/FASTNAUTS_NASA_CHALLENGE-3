@@ -8,6 +8,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { MISSION_EVENTS } from '../simulation/events';
+import PlanetaryBackdrop3D from '../three/PlanetaryBackdrop3D';
 import type { EventChoice, MissionState } from '../types';
 
 interface EmergencyCenterProps {
@@ -31,24 +32,26 @@ export default function EmergencyCenter({
       MISSION_EVENTS.find((e) => e.id === previewEventId) || MISSION_EVENTS[0];
 
     return (
-      <div className="min-h-screen bg-[#07090E] hud-grid p-6">
-        <div className="max-w-5xl mx-auto">
+      <div className="relative min-h-screen p-6 text-slate-100">
+        <PlanetaryBackdrop3D planetId={state.planetId} mode="orbit" />
+
+        <div className="max-w-5xl mx-auto relative z-10">
           <button
             type="button"
             onClick={onBackToDashboard}
-            className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white mb-6"
+            className="inline-flex items-center gap-2 text-sm text-slate-300 hover:text-white mb-6"
           >
             <ArrowLeft className="w-4 h-4" /> Return to Mission Control
           </button>
 
-          <div className="rounded-xl bg-space-900 border border-emerald-500/40 p-6 mb-6 flex items-center gap-4">
+          <div className="rounded-2xl astra-glass-success p-6 mb-6 flex items-center gap-4">
             <CheckCircle2 className="w-8 h-8 text-emerald-400 shrink-0" />
             <div>
-              <div className="text-xs font-mono text-emerald-400">● Systems Nominal</div>
+              <div className="text-xs font-mono text-emerald-300">● Systems Nominal</div>
               <h1 className="font-display text-2xl font-bold text-white">
                 No Active Emergencies on Day {state.day}
               </h1>
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-slate-200">
                 Inspect planetary hazard field guides below or review your past engineering
                 decisions.
               </p>
@@ -56,8 +59,8 @@ export default function EmergencyCenter({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="rounded-xl bg-space-900 border border-slate-800 p-5">
-              <div className="text-xs font-mono text-sky-400 mb-3">
+            <div className="rounded-2xl astra-glass p-5">
+              <div className="text-xs font-mono text-cyan-400 mb-3">
                 Space Science Hazard Field Guide
               </div>
               <div className="flex flex-wrap gap-2 mb-4">
@@ -68,38 +71,38 @@ export default function EmergencyCenter({
                     onClick={() => setPreviewEventId(ev.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
                       previewEvent.id === ev.id
-                        ? 'bg-sky-500/15 border-sky-400 text-white'
-                        : 'bg-space-950 border-slate-800 text-slate-400 hover:text-white'
+                        ? 'bg-cyan-500/20 border-cyan-400 text-white'
+                        : 'astra-glass-subtle text-slate-300 hover:text-white'
                     }`}
                   >
                     {ev.title}
                   </button>
                 ))}
               </div>
-              <div className="p-4 rounded-lg bg-space-950 border border-slate-800">
+              <div className="p-4 rounded-xl astra-glass-subtle">
                 <div className="font-semibold text-amber-300 text-sm mb-1">
                   {previewEvent.scienceQuestion}
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
+                <p className="text-xs text-slate-200 leading-relaxed">
                   {previewEvent.scienceExplanation}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-xl bg-space-900 border border-slate-800 p-5">
-              <div className="text-xs font-mono text-sky-400 mb-3">
+            <div className="rounded-2xl astra-glass p-5">
+              <div className="text-xs font-mono text-cyan-400 mb-3">
                 Commander Decision History
               </div>
               {state.eventHistory.length === 0 ? (
-                <p className="text-sm text-slate-400">No emergency events resolved yet.</p>
+                <p className="text-sm text-slate-300">No emergency events resolved yet.</p>
               ) : (
                 <div className="space-y-2.5">
                   {state.eventHistory.map((item, idx) => (
                     <div
                       key={idx}
-                      className="p-3 rounded-lg bg-space-950 border border-slate-800 text-xs"
+                      className="p-3 rounded-xl astra-glass-subtle text-xs"
                     >
-                      <div className="font-mono text-slate-400">
+                      <div className="font-mono text-slate-300">
                         Day {item.day} · {item.eventTitle}
                       </div>
                       <div className="text-white font-semibold mt-0.5">{item.choiceLabel}</div>
@@ -115,11 +118,13 @@ export default function EmergencyCenter({
   }
 
   return (
-    <div className="min-h-screen bg-[#07090E] hud-grid p-4 sm:p-6 flex items-center justify-center">
-      <div className="max-w-4xl w-full rounded-xl bg-space-900 border border-rose-500/50 p-6 sm:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-6">
+    <div className="relative min-h-screen p-4 sm:p-6 flex items-center justify-center text-slate-100">
+      <PlanetaryBackdrop3D planetId={state.planetId} mode="storm" />
+
+      <div className="max-w-4xl w-full rounded-2xl astra-glass-alert p-6 sm:p-8 relative z-10">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/15 pb-4 mb-6">
           <div>
-            <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-rose-400 mb-1">
+            <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-rose-300 mb-1">
               <AlertTriangle className="w-4 h-4" />
               Emergency Event · Day {state.day}
             </div>
@@ -128,8 +133,8 @@ export default function EmergencyCenter({
             </h1>
           </div>
 
-          <div className="px-3.5 py-2 rounded-lg bg-space-950 border border-slate-800 text-right">
-            <div className="text-xs font-mono text-slate-400">Available Credits</div>
+          <div className="px-3.5 py-2 rounded-xl astra-glass-subtle text-right">
+            <div className="text-xs font-mono text-slate-300">Available Credits</div>
             <div className="font-mono tabular-nums text-lg font-bold text-emerald-400">
               {state.budget} CR
             </div>
@@ -137,7 +142,7 @@ export default function EmergencyCenter({
         </div>
 
         {state.shelterRefugeActive && (
-          <div className="p-3 rounded-lg bg-amber-950/50 border border-amber-500/50 text-xs text-amber-200 flex items-center gap-2 mb-4">
+          <div className="p-3 rounded-xl astra-glass-warn text-xs text-amber-100 flex items-center gap-2 mb-4">
             <Shield className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
               <strong>Emergency Shelter Refuge Active:</strong> Crew has entered pressurized
@@ -146,9 +151,9 @@ export default function EmergencyCenter({
           </div>
         )}
 
-        <div className="p-4 rounded-lg bg-space-950 border border-slate-800 mb-6">
-          <div className="text-xs font-mono text-amber-400 mb-1">Mission Situation</div>
-          <p className="text-sm sm:text-base text-slate-200 leading-relaxed">
+        <div className="p-4 rounded-xl astra-glass-subtle mb-6">
+          <div className="text-xs font-mono text-amber-300 mb-1">Mission Situation</div>
+          <p className="text-sm sm:text-base text-slate-100 leading-relaxed">
             {active.description}
           </p>
         </div>
@@ -165,18 +170,18 @@ export default function EmergencyCenter({
           </button>
 
           {showScience && (
-            <div className="mt-3 p-4 rounded-lg bg-space-950 border border-sky-500/40">
-              <div className="flex items-center gap-2 text-xs font-mono text-sky-300 mb-1">
+            <div className="mt-3 p-4 rounded-xl astra-glass-subtle border border-cyan-400/40">
+              <div className="flex items-center gap-2 text-xs font-mono text-cyan-300 mb-1">
                 <Lightbulb className="w-4 h-4" /> {active.scienceQuestion}
               </div>
-              <p className="text-sm text-slate-200 leading-relaxed">
+              <p className="text-sm text-slate-100 leading-relaxed">
                 {active.scienceExplanation}
               </p>
             </div>
           )}
         </div>
 
-        <div className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-3">
+        <div className="text-xs font-mono uppercase tracking-wider text-slate-300 mb-3">
           Choose Your Engineering Response
         </div>
 
@@ -192,10 +197,10 @@ export default function EmergencyCenter({
                 key={choice.id}
                 disabled={!affordable}
                 onClick={() => onSelectDecision(choice)}
-                className={`w-full text-left p-4 rounded-lg border transition-colors ${
+                className={`w-full text-left p-4 rounded-xl border transition-colors ${
                   affordable
-                    ? 'bg-space-950 border-slate-700 hover:border-sky-400 hover:bg-space-800'
-                    : 'bg-space-950/50 border-slate-800 opacity-50 cursor-not-allowed'
+                    ? 'astra-glass-subtle hover:border-cyan-400/70 hover:bg-cyan-500/12'
+                    : 'astra-glass-subtle opacity-50 cursor-not-allowed'
                 }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">

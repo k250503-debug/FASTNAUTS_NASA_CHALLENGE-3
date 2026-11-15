@@ -50,11 +50,13 @@ interface UniverseOverlayHUDProps {
 function TelemetryRow({ label, value }: { label: string; value?: string }) {
   if (!value) return null;
   return (
-    <div className="py-1.5 border-b border-white/10 last:border-b-0">
-      <div className="text-[10px] font-mono uppercase tracking-wider text-cyan-400/85">
+    <div className="py-1.5 border-b border-cyan-300/15 last:border-b-0">
+      <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-cyan-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
         {label}
       </div>
-      <div className="text-xs text-slate-100 leading-snug mt-0.5 tabular-nums">{value}</div>
+      <div className="text-xs text-white leading-snug mt-0.5 tabular-nums drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+        {value}
+      </div>
     </div>
   );
 }
@@ -181,49 +183,64 @@ export default function UniverseOverlayHUD({
             {journeyBody ? (
               <motion.div
                 key={journeyBody.id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
+                initial={{ opacity: 0, x: -18, filter: 'blur(6px)' }}
+                animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, x: 14, filter: 'blur(4px)' }}
                 transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-                className="max-w-md"
+                className="relative max-w-md pl-4 pr-3 py-2 bg-transparent"
               >
-                <div className="text-[11px] font-mono uppercase tracking-[0.22em] text-cyan-400 mb-1.5">
+                {/* Cinematic Holographic Vertical Accent & Corner Brackets */}
+                <span
+                  aria-hidden="true"
+                  className="absolute left-0 top-1 bottom-1 w-0.5 bg-gradient-to-b from-cyan-300 via-sky-400/60 to-transparent shadow-[0_0_12px_rgba(34,211,238,0.65)]"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-cyan-300/80"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-cyan-300/60"
+                />
+
+                <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.26em] text-cyan-300 mb-1.5 drop-shadow-[0_1px_6px_rgba(0,0,0,0.9)]">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-300 animate-pulse" />
                   {journeyBody.subtitle}
                 </div>
-                <h2 className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-white drop-shadow">
+                <h2 className="font-display text-4xl sm:text-6xl font-bold tracking-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.92)]">
                   {journeyBody.name}
                 </h2>
-                <p className="text-sm text-slate-300 leading-relaxed mt-2.5 max-w-sm">
+                <p className="text-sm text-slate-100 leading-relaxed mt-2.5 max-w-sm drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
                   {journeyBody.shortDesc}
                 </p>
 
-                <div className="mt-4 pt-3 border-t border-cyan-400/25 grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                <div className="mt-4 pt-3 border-t border-cyan-300/35 grid grid-cols-2 gap-x-6 gap-y-2.5 text-xs">
                   {journeyBody.avgDistanceSun && (
                     <div>
-                      <span className="block text-[10px] font-mono uppercase tracking-wider text-cyan-300/75">
+                      <span className="block text-[10px] font-mono uppercase tracking-wider text-cyan-300/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
                         Distance
                       </span>
-                      <span className="font-mono text-slate-100 tabular-nums">
+                      <span className="font-mono text-white tabular-nums drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">
                         {journeyBody.avgDistanceSun}
                       </span>
                     </div>
                   )}
                   {journeyBody.diameter && (
                     <div>
-                      <span className="block text-[10px] font-mono uppercase tracking-wider text-cyan-300/75">
+                      <span className="block text-[10px] font-mono uppercase tracking-wider text-cyan-300/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
                         Diameter
                       </span>
-                      <span className="font-mono text-slate-100 tabular-nums">
+                      <span className="font-mono text-white tabular-nums drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">
                         {journeyBody.diameter}
                       </span>
                     </div>
                   )}
                   {journeyBody.gravity && (
                     <div>
-                      <span className="block text-[10px] font-mono uppercase tracking-wider text-cyan-300/75">
+                      <span className="block text-[10px] font-mono uppercase tracking-wider text-cyan-300/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
                         Gravity
                       </span>
-                      <span className="font-mono text-slate-100 tabular-nums">
+                      <span className="font-mono text-white tabular-nums drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">
                         {journeyBody.gravity}
                       </span>
                     </div>
@@ -232,14 +249,14 @@ export default function UniverseOverlayHUD({
                     journeyBody.classification ||
                     journeyBody.orbitType) && (
                     <div>
-                      <span className="block text-[10px] font-mono uppercase tracking-wider text-cyan-300/75">
+                      <span className="block text-[10px] font-mono uppercase tracking-wider text-cyan-300/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
                         {journeyBody.orbitalPeriod
                           ? 'Orbital Period'
                           : journeyBody.classification
                           ? 'Classification'
                           : 'Orbit'}
                       </span>
-                      <span className="font-mono text-slate-100 tabular-nums">
+                      <span className="font-mono text-white tabular-nums drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">
                         {journeyBody.orbitalPeriod ||
                           journeyBody.classification ||
                           journeyBody.orbitType}
@@ -273,7 +290,7 @@ export default function UniverseOverlayHUD({
               onToggleAudio();
             }}
             aria-label={isAudioMuted ? 'Unmute audio' : 'Mute audio'}
-            className="pointer-events-auto p-2.5 rounded-lg bg-[#050811]/85 border border-slate-800 hover:border-cyan-400 text-slate-200 transition-colors"
+            className="pointer-events-auto p-2.5 rounded-lg astra-glass-pill border border-cyan-300/20 hover:border-cyan-400 text-slate-200 transition-colors"
           >
             {isAudioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
@@ -295,7 +312,7 @@ export default function UniverseOverlayHUD({
               playSpaceSfx('ui_click', isAudioMuted);
               onSkipJourney();
             }}
-            className="pointer-events-auto px-4 py-2 rounded-lg bg-[#050811]/90 border border-slate-700 hover:border-cyan-400 text-xs font-mono text-slate-100 flex items-center gap-2 transition-colors whitespace-nowrap shrink-0"
+            className="pointer-events-auto px-4 py-2 rounded-lg astra-glass-subtle hover:border-cyan-400 text-xs font-mono text-slate-100 flex items-center gap-2 transition-colors whitespace-nowrap shrink-0"
           >
             <SkipForward className="w-3.5 h-3.5 text-cyan-400" />
             Skip to Solar System
@@ -365,7 +382,7 @@ export default function UniverseOverlayHUD({
       {/* Subtle Top-Left Brand + Interaction Hint */}
       {!hudHidden && (
         <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-4">
-          <div className="pointer-events-auto flex items-center gap-3 px-3.5 py-2 rounded-lg bg-[#050811]/88 border border-slate-800">
+          <div className="pointer-events-auto flex items-center gap-3 px-3.5 py-2 rounded-lg astra-glass-dock border">
             <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
             <span className="font-display text-sm font-bold tracking-[0.14em] text-white whitespace-nowrap">
               ASTRO MISSION
@@ -393,7 +410,7 @@ export default function UniverseOverlayHUD({
               type="button"
               onClick={() => setHudHidden(true)}
               title="Cinema Mode (Hide HUD)"
-              className="p-2 rounded-lg bg-[#050811]/88 border border-slate-800 hover:border-cyan-400 text-slate-300 hover:text-white transition-colors"
+              className="p-2 rounded-lg astra-glass-pill border border-cyan-300/20 hover:border-cyan-400 text-slate-200 hover:text-white transition-colors"
             >
               <EyeOff className="w-4 h-4" />
             </button>
@@ -406,30 +423,53 @@ export default function UniverseOverlayHUD({
         <button
           type="button"
           onClick={() => setHudHidden(false)}
-          className="pointer-events-auto absolute top-4 right-4 px-3 py-2 rounded-lg bg-[#050811]/85 border border-slate-700 hover:border-cyan-400 text-xs font-mono text-slate-200 flex items-center gap-1.5"
+          className="pointer-events-auto absolute top-4 right-4 px-3 py-2 rounded-lg astra-glass-pill border border-cyan-300/25 hover:border-cyan-400 text-xs font-mono text-slate-100 flex items-center gap-1.5"
         >
           <Eye className="w-3.5 h-3.5 text-cyan-400" />
           Show HUD
         </button>
       )}
 
-      {/* Floating Selected Body Telemetry Readout (Phase 3 Interactive) */}
-      <AnimatePresence>
+      {/* Floating Holographic Selected Body Telemetry Readout */}
+      <AnimatePresence mode="wait">
         {!hudHidden && selectedBody && (
           <motion.aside
             key={selectedBody.id}
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -16 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="pointer-events-auto absolute left-4 top-16 w-[min(365px,calc(100vw-2rem))] max-h-[calc(100vh-175px)] flex flex-col rounded-xl bg-[#050811]/90 border border-cyan-500/25 shadow-2xl overflow-hidden"
+            initial={{ opacity: 0, x: -22, scale: 0.97 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -18, scale: 0.97 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className="pointer-events-auto absolute left-4 top-16 w-[min(370px,calc(100vw-2rem))] max-h-[calc(100vh-175px)] flex flex-col rounded-xl astra-glass-holo overflow-hidden"
           >
-            <div className="px-4 py-3 border-b border-white/10 flex items-start justify-between gap-3">
+            {/* Holographic Corner Reticles & Subtle Telemetry Scanline */}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-cyan-300/90 rounded-tl-xl z-20"
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute top-0 right-0 w-3.5 h-3.5 border-t-2 border-r-2 border-cyan-300/90 rounded-tr-xl z-20"
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-0 left-0 w-3.5 h-3.5 border-b-2 border-l-2 border-cyan-300/90 rounded-bl-xl z-20"
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-cyan-300/90 rounded-br-xl z-20"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 h-16 astra-holo-scanline z-10"
+            />
+
+            <div className="relative z-10 px-4 py-3 border-b border-cyan-300/20 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-cyan-400 truncate">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.22em] text-cyan-300 truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-300 animate-pulse shrink-0" />
                   {selectedBody.subtitle}
                 </div>
-                <h2 className="font-display text-xl font-bold text-white truncate mt-0.5">
+                <h2 className="font-display text-2xl font-bold text-white truncate mt-0.5 drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]">
                   {selectedBody.name}
                 </h2>
               </div>
@@ -438,7 +478,7 @@ export default function UniverseOverlayHUD({
                   type="button"
                   onClick={() => setInfoCollapsed((c) => !c)}
                   aria-label={infoCollapsed ? 'Expand details' : 'Collapse details'}
-                  className="p-1.5 rounded-md hover:bg-slate-800 text-slate-300"
+                  className="p-1.5 rounded-md hover:bg-cyan-400/15 text-cyan-200 hover:text-white transition-colors"
                 >
                   {infoCollapsed ? (
                     <ChevronDown className="w-4 h-4" />
@@ -453,7 +493,7 @@ export default function UniverseOverlayHUD({
                     onOverview();
                   }}
                   aria-label="Return to Solar Overview"
-                  className="p-1.5 rounded-md hover:bg-slate-800 text-slate-300 hover:text-white"
+                  className="p-1.5 rounded-md hover:bg-cyan-400/15 text-cyan-200 hover:text-white transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -461,8 +501,8 @@ export default function UniverseOverlayHUD({
             </div>
 
             {!infoCollapsed && (
-              <div className="px-4 py-3 overflow-y-auto space-y-2">
-                <p className="text-xs text-slate-300 leading-relaxed">
+              <div className="relative z-10 px-4 py-3 overflow-y-auto space-y-2">
+                <p className="text-xs text-slate-100 leading-relaxed drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
                   {selectedBody.shortDesc}
                 </p>
                 {renderFullDossier(selectedBody)}
@@ -471,14 +511,14 @@ export default function UniverseOverlayHUD({
 
             {/* Launch Outpost button directly on playable worlds (Moon, Mars, Titan, Europa) */}
             {selectedBody.playableWorldId && (
-              <div className="p-3 border-t border-white/10 bg-[#070B14]">
+              <div className="relative z-10 p-3 border-t border-cyan-300/20">
                 <button
                   type="button"
                   onClick={() => {
                     playSpaceSfx('ui_select', isAudioMuted);
                     onLaunchMissionSetup(selectedBody.playableWorldId);
                   }}
-                  className="w-full py-2.5 px-4 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+                  className="w-full py-2.5 px-4 rounded-lg bg-cyan-400/90 hover:bg-cyan-300 text-slate-950 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors whitespace-nowrap shadow-[0_0_20px_rgba(34,211,238,0.35)]"
                 >
                   <Rocket className="w-4 h-4" />
                   Land &amp; Command Outpost on {selectedBody.name}
@@ -497,9 +537,9 @@ export default function UniverseOverlayHUD({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="pointer-events-auto fixed bottom-20 left-1/2 -translate-x-1/2 w-[min(920px,calc(100vw-2rem))] max-h-[60vh] overflow-y-auto rounded-xl bg-[#050811]/95 border border-slate-700 p-4 shadow-2xl"
+            className="pointer-events-auto fixed bottom-20 left-1/2 -translate-x-1/2 w-[min(920px,calc(100vw-2rem))] max-h-[60vh] overflow-y-auto rounded-xl astra-glass-modal p-4 shadow-2xl"
           >
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/15">
               <div className="text-xs font-mono uppercase tracking-wider text-cyan-400">
                 Celestial Navigator — Click Any Destination
               </div>
@@ -530,7 +570,7 @@ export default function UniverseOverlayHUD({
                       className={`w-full px-2.5 py-1.5 rounded-md text-left flex items-center justify-between transition-colors ${
                         selectedBodyId === b.id
                           ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                          : 'hover:bg-slate-800/80 text-slate-200'
+                          : 'hover:bg-cyan-400/15 text-slate-200'
                       }`}
                     >
                       <span className="truncate">{b.name}</span>
@@ -559,7 +599,7 @@ export default function UniverseOverlayHUD({
                       className={`w-full px-2.5 py-1.5 rounded-md text-left flex items-center justify-between transition-colors ${
                         selectedBodyId === b.id
                           ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                          : 'hover:bg-slate-800/80 text-slate-200'
+                          : 'hover:bg-cyan-400/15 text-slate-200'
                       }`}
                     >
                       <span className="truncate">{b.name}</span>
@@ -588,7 +628,7 @@ export default function UniverseOverlayHUD({
                       className={`w-full px-2.5 py-1.5 rounded-md text-left truncate transition-colors ${
                         selectedBodyId === b.id
                           ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                          : 'hover:bg-slate-800/80 text-slate-200'
+                          : 'hover:bg-cyan-400/15 text-slate-200'
                       }`}
                     >
                       {b.name}
@@ -614,7 +654,7 @@ export default function UniverseOverlayHUD({
                       className={`w-full px-2.5 py-1.5 rounded-md text-left truncate transition-colors ${
                         selectedBodyId === b.id
                           ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                          : 'hover:bg-slate-800/80 text-slate-200'
+                          : 'hover:bg-cyan-400/15 text-slate-200'
                       }`}
                     >
                       {b.name}
@@ -629,7 +669,7 @@ export default function UniverseOverlayHUD({
 
       {/* Collapsible Bottom Control Dock (Zero Viewport Occlusion) */}
       {!hudHidden && (
-        <div className="pointer-events-auto fixed bottom-4 left-1/2 -translate-x-1/2 max-w-[96vw] overflow-x-auto rounded-xl bg-[#050811]/92 border border-slate-800 px-2.5 py-2 flex items-center gap-1.5 shadow-2xl">
+        <div className="pointer-events-auto fixed bottom-4 left-1/2 -translate-x-1/2 max-w-[96vw] overflow-x-auto rounded-xl astra-glass-dock border px-2.5 py-2 flex items-center gap-1.5 shadow-2xl">
           <button
             type="button"
             onClick={() => {
@@ -638,8 +678,8 @@ export default function UniverseOverlayHUD({
             }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
               finderOpen
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                : 'bg-slate-900 hover:bg-slate-800 text-slate-100 border border-slate-800'
+                ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400/50'
+                : 'astra-glass-subtle hover:border-cyan-400/50 text-slate-100'
             }`}
           >
             <Compass className="w-3.5 h-3.5 text-cyan-400" />
@@ -653,14 +693,14 @@ export default function UniverseOverlayHUD({
               onOverview();
               setFinderOpen(false);
             }}
-            className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+            className="px-3 py-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
           >
             <Globe className="w-3.5 h-3.5 text-sky-400" />
             Solar View
           </button>
 
           {/* Orbit Time Speed */}
-          <div className="flex items-center rounded-lg bg-slate-900 border border-slate-800 p-0.5 shrink-0">
+          <div className="flex items-center rounded-lg astra-glass-subtle p-0.5 shrink-0">
             {[
               { label: 'Pause', val: 0 },
               { label: '1×', val: 1 },
@@ -674,7 +714,7 @@ export default function UniverseOverlayHUD({
                 className={`px-2 py-1 rounded-md text-[11px] font-mono transition-colors whitespace-nowrap ${
                   timeScale === spd.val
                     ? 'bg-cyan-400 text-slate-950 font-bold'
-                    : 'text-slate-400 hover:text-white'
+                    : 'text-slate-300 hover:text-white'
                 }`}
               >
                 {spd.val === 0 ? <Pause className="w-3 h-3 inline" /> : spd.label}
@@ -689,13 +729,13 @@ export default function UniverseOverlayHUD({
               setFinderOpen(false);
               onReplayJourney();
             }}
-            className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+            className="px-3 py-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
           >
             <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
             Replay Tour
           </button>
 
-          <div className="h-5 w-px bg-slate-800 mx-0.5 shrink-0" />
+          <div className="h-5 w-px bg-white/15 mx-0.5 shrink-0" />
 
           <button
             type="button"
@@ -703,7 +743,7 @@ export default function UniverseOverlayHUD({
               playSpaceSfx('ui_click', isAudioMuted);
               onOpenEquipment();
             }}
-            className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+            className="px-3 py-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
           >
             <Cpu className="w-3.5 h-3.5 text-cyan-400" />
             3D Equipment
@@ -715,7 +755,7 @@ export default function UniverseOverlayHUD({
               playSpaceSfx('ui_click', isAudioMuted);
               onOpenAstronauts();
             }}
-            className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+            className="px-3 py-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
           >
             <Users className="w-3.5 h-3.5 text-sky-400" />
             Crew &amp; Suits
@@ -737,7 +777,7 @@ export default function UniverseOverlayHUD({
             type="button"
             onClick={onToggleAudio}
             aria-label={isAudioMuted ? 'Unmute audio' : 'Mute audio'}
-            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white shrink-0"
+            className="p-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-slate-200 hover:text-white shrink-0"
           >
             {isAudioMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
           </button>

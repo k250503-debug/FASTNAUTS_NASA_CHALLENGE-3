@@ -13,6 +13,7 @@ import {
 } from './models';
 import { createTerrainAndSkyGroup, getPlanetEnvironmentSpec, groundHeightAt } from './terrain';
 import { playSpaceSfx } from '../utils/spaceAudio';
+import { speakNasaText, stopNasaSpeech } from '../utils/nasaVoice';
 import { useTourSoundtrack } from '../utils/useTourSoundtrack';
 import type { PlanetId } from '../types';
 
@@ -71,6 +72,16 @@ export default function CinematicStoryScene({
   useEffect(() => {
     syncPlanetRef.current?.(planetId);
   }, [planetId]);
+
+  useEffect(() => {
+    if (isAudioMuted) stopNasaSpeech();
+  }, [isAudioMuted]);
+
+  useEffect(() => {
+    return () => {
+      stopNasaSpeech();
+    };
+  }, []);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -292,6 +303,9 @@ export default function CinematicStoryScene({
       let playedSwell = false;
       let playedThruster = false;
       let playedTouchdown = false;
+      let voicedAct1 = false;
+      let voicedAct2 = false;
+      let voicedAct3 = false;
 
       _camPos.set(-22, 6.5, 24);
       _camLook.set(0, 2.5, 0);
@@ -301,6 +315,10 @@ export default function CinematicStoryScene({
         playedSwell = false;
         playedThruster = false;
         playedTouchdown = false;
+        voicedAct1 = false;
+        voicedAct2 = false;
+        voicedAct3 = false;
+        stopNasaSpeech();
         setStoryFinished(false);
         setActIndex(1);
         setProgress01(0);
@@ -318,11 +336,20 @@ export default function CinematicStoryScene({
         const norm = t / TOTAL_STORY_DURATION;
         setProgress01(norm);
 
+        const activePlanet = getPlanetById(planetIdRef.current);
+
         if (t < 6.5) {
           setActIndex(1);
           if (!playedSwell && t > 0.25) {
             playedSwell = true;
             playSpaceSfx('cinematic_swell', mutedRef.current);
+          }
+          if (!voicedAct1 && t > 0.65) {
+            voicedAct1 = true;
+            speakNasaText(
+              `Orbital horizon over ${activePlanet.name}. Initiating powered approach vector.`,
+              { muted: mutedRef.current, radioComms: true, queue: false, rate: 1.0, pitch: 1.1 }
+            );
           }
         } else if (t < 15.0) {
           setActIndex(2);
@@ -330,11 +357,25 @@ export default function CinematicStoryScene({
             playedThruster = true;
             playSpaceSfx('thruster', mutedRef.current);
           }
+          if (!voicedAct2 && t > 6.8) {
+            voicedAct2 = true;
+            speakNasaText(
+              'Retro-propulsion engines burning. Descending toward crater-rim landing pad.',
+              { muted: mutedRef.current, radioComms: true, queue: true, rate: 1.0, pitch: 1.1 }
+            );
+          }
         } else {
           setActIndex(3);
           if (!playedTouchdown && t > 15.1) {
             playedTouchdown = true;
             playSpaceSfx('touchdown', mutedRef.current);
+          }
+          if (!voicedAct3 && t > 15.4) {
+            voicedAct3 = true;
+            speakNasaText(
+              `Touchdown confirmed on ${activePlanet.name}. Airlock open, outpost surface operations ready.`,
+              { muted: mutedRef.current, radioComms: true, queue: true, rate: 1.0, pitch: 1.1 }
+            );
           }
         }
 
@@ -503,12 +544,12 @@ export default function CinematicStoryScene({
       )}
 
       {/* Cinematic Letterbox Bars */}
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-10 bg-black/80 z-10" />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 h-10 bg-black/80 z-10" />
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-10 bg-gradient-to-b from-black/65 to-transparent z-10" />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/65 to-transparent z-10" />
 
-      {/* Top Controls Strip (Solid Dark Backing — No backdrop-blur over WebGL) */}
+      {/* Top Controls Strip */}
       <div className="absolute top-12 inset-x-6 z-20 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 bg-[#07090E]/90 border border-slate-800 rounded-lg p-1">
+        <div className="flex items-center gap-2 astra-glass rounded-lg p-1">
           {PLANETS.map((p) => (
             <button
               key={p.id}
@@ -519,8 +560,8 @@ export default function CinematicStoryScene({
               }}
               className={`px-3 py-1.5 rounded-md text-xs font-mono transition-colors whitespace-nowrap shrink-0 ${
                 planetId === p.id
-                  ? 'bg-sky-500 text-slate-950 font-bold'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                  ? 'bg-cyan-400 text-slate-950 font-bold'
+                  : 'text-slate-200 hover:text-white hover:bg-white/10'
               }`}
             >
               {p.name}
@@ -533,12 +574,12 @@ export default function CinematicStoryScene({
             type="button"
             onClick={onToggleAudio}
             aria-label={isAudioMuted ? 'Unmute Audio' : 'Mute Audio'}
-            className="px-3 py-1.5 rounded-lg bg-[#07090E]/90 border border-slate-700 hover:border-sky-400 text-xs font-mono text-slate-200 flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400 text-xs font-mono text-slate-200 flex items-center gap-1.5 transition-colors"
           >
             {isAudioMuted ? (
-              <VolumeX className="w-3.5 h-3.5 text-slate-500" />
+              <VolumeX className="w-3.5 h-3.5 text-slate-400" />
             ) : (
-              <Volume2 className="w-3.5 h-3.5 text-sky-400" />
+              <Volume2 className="w-3.5 h-3.5 text-cyan-300" />
             )}
             <span>{isAudioMuted ? 'Muted' : 'Audio'}</span>
           </button>
@@ -550,19 +591,20 @@ export default function CinematicStoryScene({
               restartRef.current?.();
               setStoryReplaySignal((s) => s + 1);
             }}
-            className="px-3 py-1.5 rounded-lg bg-[#07090E]/90 border border-slate-700 hover:border-sky-400 text-xs font-mono text-slate-200 flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg astra-glass-subtle hover:border-cyan-400 text-xs font-mono text-slate-200 flex items-center gap-1.5 transition-colors"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-sky-400" />
+            <RotateCcw className="w-3.5 h-3.5 text-cyan-300" />
             <span>Replay</span>
           </button>
 
           <button
             type="button"
             onClick={() => {
+              stopNasaSpeech();
               playSpaceSfx('ui_select', isAudioMuted);
               onContinueToSetup(planetId);
             }}
-            className="px-4 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-display font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0"
+            className="px-4 py-1.5 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-display font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors"
           >
             <SkipForward className="w-3.5 h-3.5" />
             <span>Skip to Mission Setup</span>
@@ -586,17 +628,17 @@ export default function CinematicStoryScene({
 
       {/* Bottom Cinematic Story Overlay & Transitions */}
       <div className="absolute bottom-14 inset-x-6 z-20 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="max-w-xl bg-[#07090E]/90 border border-slate-800 rounded-xl px-5 py-4">
-          <div className="text-[11px] font-mono uppercase tracking-wider text-sky-400 mb-1">
+        <div className="max-w-xl astra-glass rounded-xl px-5 py-4">
+          <div className="text-[11px] font-mono uppercase tracking-wider text-cyan-300 mb-1">
             {actMeta.kicker}
           </div>
           <h2 className="font-display text-xl sm:text-2xl font-bold text-white mb-1">
             {actMeta.heading}
           </h2>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-3">{actMeta.caption}</p>
-          <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed mb-3">{actMeta.caption}</p>
+          <div className="w-full h-1 bg-slate-950/60 border border-white/10 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-sky-500 to-cyan-300 transition-[width] duration-150"
+              className="h-full bg-gradient-to-r from-cyan-400 to-sky-300 transition-[width] duration-150"
               style={{ width: `${Math.round(progress01 * 100)}%` }}
             />
           </div>
@@ -610,7 +652,7 @@ export default function CinematicStoryScene({
                 playSpaceSfx('ui_click', isAudioMuted);
                 onOpenEquipment();
               }}
-              className="px-4 py-3 rounded-lg bg-[#0F1623]/95 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-cyan-300 whitespace-nowrap shrink-0"
+              className="px-4 py-3 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs font-semibold text-cyan-300 whitespace-nowrap shrink-0 transition-colors"
             >
               Inspect 3D Equipment
             </button>
@@ -622,7 +664,7 @@ export default function CinematicStoryScene({
                 playSpaceSfx('ui_click', isAudioMuted);
                 onOpenAstronauts();
               }}
-              className="px-4 py-3 rounded-lg bg-[#0F1623]/95 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-sky-300 whitespace-nowrap shrink-0"
+              className="px-4 py-3 rounded-lg astra-glass-subtle hover:border-cyan-400/50 text-xs font-semibold text-cyan-200 whitespace-nowrap shrink-0 transition-colors"
             >
               Astronaut Gallery
             </button>
@@ -630,10 +672,11 @@ export default function CinematicStoryScene({
           <button
             type="button"
             onClick={() => {
+              stopNasaSpeech();
               playSpaceSfx('ui_select', isAudioMuted);
               onContinueToSetup(planetId);
             }}
-            className="px-6 py-3 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-display font-bold text-sm flex items-center gap-2 whitespace-nowrap shrink-0 shadow-lg"
+            className="px-6 py-3 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-display font-bold text-sm flex items-center gap-2 whitespace-nowrap shrink-0 shadow-lg transition-colors"
           >
             {storyFinished ? <Play className="w-4 h-4 fill-current" /> : <ArrowRight className="w-4 h-4" />}
             <span>{storyFinished ? 'Begin Command Setup' : 'Launch Commander Setup'}</span>
