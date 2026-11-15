@@ -18,6 +18,7 @@ import {
   Fuel,
   Globe,
   HeartPulse,
+  ListChecks,
   LogOut,
   Package,
   Pause,
@@ -57,6 +58,7 @@ import { getBuildingDef } from '../data/buildings';
 import { getPlanetById } from '../data/planets';
 import { SPARE_PART_DEFS } from '../data/systems';
 import { calculateDailyPreview } from '../simulation/calculations';
+import { getDailyCompletionStatus } from '../simulation/dayCompletion';
 import OutpostScene3D, {
   type NearbyTarget,
   type OutpostCameraMode,
@@ -85,7 +87,6 @@ interface MissionControlProps {
   state: MissionState;
   isAudioMuted: boolean;
   onToggleAudio: () => void;
-  onAdvanceDay: () => void;
   onToggleBuilding: (uid: string) => void;
   onUpgradeBuilding: (uid: string) => void;
   onConstructBuilding: (typeId: BuildingTypeId, cellIndex: number) => void;
@@ -122,7 +123,6 @@ export default function MissionControl({
   state,
   isAudioMuted,
   onToggleAudio,
-  onAdvanceDay,
   onToggleBuilding,
   onUpgradeBuilding,
   onConstructBuilding,
@@ -273,6 +273,13 @@ export default function MissionControl({
       busyTimerRef.current = null;
     }
     setBusyDuty(null);
+    setActiveModal(null);
+    setOpsModal(null);
+    setOpsMenuOpen(false);
+    setSelectedResource(null);
+    setSelectedBuildingUid(null);
+    setMiniGameState(null);
+    setAdvisorOpen(false);
   }, [state.day]);
 
   const triggerBusyDuty = (
@@ -301,10 +308,11 @@ export default function MissionControl({
 
   const planet = getPlanetById(state.planetId);
   const preview = calculateDailyPreview(state);
+  const dailyCompletion = getDailyCompletionStatus(state);
   const powerPct = Math.round(
     (state.resources.battery.current / state.resources.battery.max) * 100
   );
-  const collectedCount = state.dataNodes.filter((n) => n.collected).length;
+  const collectedCount = dailyCompletion.dataCollectedCount;
   const activeAstronaut = getAstronautById(state.activeAstronautId);
 
   const medicalAlertsCount = Object.values(state.crewVitals).filter(
@@ -1111,7 +1119,7 @@ export default function MissionControl({
             })}
           </div>
 
-          {/* Right Controls: Camera, Movement, Operations Drawer, Advisor, Advance Day */}
+          {/* Right Controls: Camera, Movement, Operations Drawer, Objectives, Advisor */}
           <div className="flex flex-wrap items-center gap-1.5">
             {sceneMode === 'outpost' && (
               <>
@@ -1171,25 +1179,38 @@ export default function MissionControl({
 
             <button
               type="button"
+              onClick={() => setActiveModal('objectives')}
+              className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono tabular-nums flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                dailyCompletion.allCompleted
+                  ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
+                  : 'bg-[#07090E] hover:bg-slate-800 border-slate-700 text-slate-200'
+              }`}
+            >
+              <ListChecks className="w-3.5 h-3.5 text-sky-400" />
+              <span>
+                Goals {dailyCompletion.completedObjectivesCount}/{dailyCompletion.totalObjectivesCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setAdvisorOpen(true)}
               className="px-2.5 py-1.5 rounded-lg bg-[#07090E] hover:bg-slate-800 border border-slate-700 text-xs font-medium text-sky-300 flex items-center gap-1.5 whitespace-nowrap"
             >
               <Bot className="w-3.5 h-3.5" /> Advisor
             </button>
 
-            <button
-              type="button"
-              disabled={paused || Boolean(state.activeEvent)}
-              onClick={onAdvanceDay}
-              className={`px-4 py-1.5 rounded-lg font-display font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
-                paused || state.activeEvent
-                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                  : 'bg-sky-500 hover:bg-sky-400 text-slate-950'
-              }`}
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              {state.activeEvent ? 'Resolve Emergency' : 'Advance Day'}
-            </button>
+            {state.activeEvent && (
+              <button
+                type="button"
+                disabled={paused}
+                onClick={onOpenEmergency}
+                className="px-3.5 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-slate-950 font-display font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Resolve Emergency
+              </button>
+            )}
           </div>
         </footer>
       )}
@@ -1430,6 +1451,152 @@ export default function MissionControl({
                     ))}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeModal === 'objectives' && (
+              <div className="space-y-4">
+                <div>
+                  <div className="text-xs font-mono uppercase tracking-wider text-sky-400 mb-1">
+                    Day {String(state.day).padStart(2, '0')} / {state.maxDays} · Automatic Progression Protocol
+                  </div>
+                  <h3 className="font-display text-2xl font-bold text-white">
+                    Daily Mission Objectives
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Complete all crew shifts, clear the Storm Flue, and log all {state.planetName} data nodes to complete Day {state.day}. The next day starts automatically once every objective is met.
+                  </p>
+                </div>
+
+                {/* 1. Crew Daily Shifts */}
+                <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-slate-200 font-semibold">
+                      1. Crew Daily Shifts ({dailyCompletion.crewDoneCount}/{dailyCompletion.crewTotal})
+                    </span>
+                    <span
+                      className={
+                        dailyCompletion.allCrewTasksDone ? 'text-emerald-400' : 'text-amber-300'
+                      }
+                    >
+                      {dailyCompletion.allCrewTasksDone ? 'COMPLETED' : 'IN PROGRESS'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Click any pending crew member below, then service a building, collect data, purge the flue, or run a Crew Suit diagnostic.
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {ASTRONAUTS.map((astro) => {
+                      const done = Boolean(state.crewProgress[astro.id]?.currentTaskDone);
+                      return (
+                        <button
+                          key={astro.id}
+                          type="button"
+                          onClick={() => {
+                            onSelectAstronaut(astro.id);
+                            setActiveModal(null);
+                          }}
+                          className={`px-2.5 py-2 rounded-lg border text-left text-xs flex items-center justify-between gap-2 transition-colors ${
+                            done
+                              ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+                              : 'bg-[#07090E] border-slate-700 hover:border-sky-400 text-slate-200'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <div className="font-semibold truncate">{astro.name}</div>
+                            <div className="text-[10px] font-mono text-slate-400 truncate">
+                              {astro.taskTitle}
+                            </div>
+                          </div>
+                          {done ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          ) : (
+                            <span className="text-[10px] font-mono text-amber-300 shrink-0">
+                              Select
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Storm Flue Daily Inspection */}
+                <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-mono font-semibold text-slate-200">
+                      2. Storm Flue Exhaust Inspection
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      Inspect &amp; purge exhaust vents on {state.planetName} (current blockage: {state.stormFlue.cloggedPct}%).
+                    </div>
+                  </div>
+                  {dailyCompletion.flueInspected ? (
+                    <span className="text-xs font-mono text-emerald-400 shrink-0 flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4" /> Cleared
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveModal(null);
+                        setOpsModal('flue');
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs shrink-0"
+                    >
+                      Open Flue
+                    </button>
+                  )}
+                </div>
+
+                {/* 3. Planetary Data Nodes */}
+                <div className="p-3.5 rounded-lg bg-space-950 border border-slate-800 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-mono font-semibold text-slate-200">
+                      3. {state.planetName} Data Collection ({dailyCompletion.dataCollectedCount}/{dailyCompletion.dataTotal})
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      Scan &amp; collect all planetary science nodes in the field or Telemetry Lab.
+                    </div>
+                  </div>
+                  {dailyCompletion.allDataCollected ? (
+                    <span className="text-xs font-mono text-emerald-400 shrink-0 flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4" /> Collected
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal('telemetry')}
+                      className="px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs shrink-0"
+                    >
+                      View Nodes
+                    </button>
+                  )}
+                </div>
+
+                {/* 4. Emergency Clearance */}
+                {!dailyCompletion.emergencyClear && (
+                  <div className="p-3.5 rounded-lg bg-rose-950/40 border border-rose-500/60 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-mono font-semibold text-rose-200">
+                        4. Resolve Active Emergency
+                      </div>
+                      <div className="text-[11px] text-rose-300 mt-0.5">
+                        {state.activeEvent?.title} must be resolved before Day {state.day} concludes.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveModal(null);
+                        onOpenEmergency();
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-slate-950 font-semibold text-xs shrink-0"
+                    >
+                      Resolve
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

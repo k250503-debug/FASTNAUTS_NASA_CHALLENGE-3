@@ -8,6 +8,9 @@ import BaseBuilder from './pages/BaseBuilder';
 import MissionControl from './pages/MissionControl';
 import EmergencyCenter from './pages/EmergencyCenter';
 import MissionReport from './pages/MissionReport';
+import DayTransitionOverlay, {
+  type DayTransitionRequest,
+} from './components/DayTransitionOverlay';
 import EquipmentShowcaseModal from './components/EquipmentShowcaseModal';
 import AstronautGalleryModal from './components/AstronautGalleryModal';
 import type { UniverseExperienceMode } from './three/UniverseScene3D';
@@ -23,6 +26,10 @@ import {
   saveMissionProgress,
 } from './simulation/resources';
 import { simulateNextDay } from './simulation/calculations';
+import {
+  getDailyCompletionStatus,
+  shouldTriggerStormScreen,
+} from './simulation/dayCompletion';
 import { applyEngineeringDecision } from './simulation/decisions';
 import { getAstronautById } from './data/astronauts';
 import { getBuildingDef } from './data/buildings';
@@ -71,6 +78,12 @@ export default function App() {
   const [launchStartStage, setLaunchStartStage] = useState<'boarding' | 'transit'>('boarding');
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [savedAvailable, setSavedAvailable] = useState(() => hasSavedMission());
+  const [dayTransition, setDayTransition] = useState<DayTransitionRequest | null>(null);
+
+  const simStateRef = useRef<MissionState | null>(null);
+  simStateRef.current = simState;
+  const triggeredDayRef = useRef<number | null>(null);
+  const transitionSeqRef = useRef(0);
 
   const audioRef = useRef<{
     ctx: AudioContext;
@@ -198,6 +211,41 @@ export default function App() {
     };
   }, [screen, isAudioMuted]);
 
+  useEffect(() => {
+    if (screen !== 'mission' || !simState || simState.status !== 'active') return;
+    if (dayTransition !== null) return;
+
+    const dailyStatus = getDailyCompletionStatus(simState);
+    if (!dailyStatus.allCompleted) return;
+    if (triggeredDayRef.current === simState.day) return;
+
+    const targetDay = simState.day;
+    const maxDays = simState.maxDays;
+    const planetName = simState.planetName;
+
+    const settleTimer = window.setTimeout(() => {
+      const latest = simStateRef.current;
+      if (!latest || latest.status !== 'active' || latest.day !== targetDay) return;
+      if (!getDailyCompletionStatus(latest).allCompleted) return;
+      if (triggeredDayRef.current === targetDay) return;
+
+      triggeredDayRef.current = targetDay;
+      transitionSeqRef.current += 1;
+      setDayTransition({
+        id: transitionSeqRef.current,
+        completedDay: targetDay,
+        nextDay: Math.min(targetDay + 1, maxDays),
+        maxDays,
+        planetName,
+        isFinalDay: targetDay >= maxDays,
+      });
+    }, 900);
+
+    return () => {
+      window.clearTimeout(settleTimer);
+    };
+  }, [screen, simState, dayTransition]);
+
   const handleGoHome = () => {
     setUniverseMode('interactive');
     setScreen('landing');
@@ -206,6 +254,8 @@ export default function App() {
   const handleResumeMission = () => {
     const loaded = loadSavedMission();
     if (!loaded) return;
+    triggeredDayRef.current = null;
+    setDayTransition(null);
     setSimState(loaded);
     setScreen('mission');
   };
@@ -219,6 +269,8 @@ export default function App() {
       placedBuildings,
       remainingBudget
     );
+    triggeredDayRef.current = null;
+    setDayTransition(null);
     setSimState(initial);
     setLaunchStartStage('boarding');
     setScreen('launch');
@@ -259,32 +311,33 @@ export default function App() {
     setScreen('mission');
   };
 
-  const handleAdvanceDay = () => {
-    setSimState((prev) => {
-      if (!prev) return prev;
-      const next = simulateNextDay(prev);
-      if (next.status !== 'active') {
-        setScreen('report');
-      } else {
-        const evtId = next.activeEvent?.id;
-        const isIncomingStormEvent =
-          next.activeEvent &&
-          next.activeEvent.id !== prev.activeEvent?.id &&
-          (next.activeEvent.hazardSeverity === 'shelter' ||
-            evtId === 'dust_storm' ||
-            evtId === 'storm_flue_clog' ||
-            evtId === 'cryo_plume' ||
-            evtId === 'radiation_surge' ||
-            evtId === 'europa_cryo_surge');
-        const flueCrossedStorm =
-          prev.stormFlue.cloggedPct < 65 && next.stormFlue.cloggedPct >= 65;
+  const handleActivateNextDayFromTransition = () => {
+    const current = simStateRef.current;
+    if (!current || current.status !== 'active') return;
 
-        if (isIncomingStormEvent || flueCrossedStorm) {
-          setScreen('storm');
-        }
+    // Save completed day progress before generating next day state
+    saveMissionProgress(current);
+
+    const next = simulateNextDay(current);
+    setSimState(next);
+
+    if (next.status !== 'active') {
+      clearSavedMission();
+      setSavedAvailable(false);
+      setScreen('report');
+    } else {
+      saveMissionProgress(next);
+      setSavedAvailable(true);
+      if (shouldTriggerStormScreen(current, next)) {
+        setScreen('storm');
+      } else {
+        setScreen('mission');
       }
-      return next;
-    });
+    }
+  };
+
+  const handleDayTransitionComplete = () => {
+    setDayTransition(null);
   };
 
   const handleToggleBuilding = (uid: string) => {
@@ -1212,6 +1265,8 @@ export default function App() {
   const handlePlayAgain = () => {
     clearSavedMission();
     setSavedAvailable(false);
+    triggeredDayRef.current = null;
+    setDayTransition(null);
     setDraftBuildings([]);
     setSimState(null);
     setScreen('planet');
@@ -1461,7 +1516,6 @@ export default function App() {
           state={simState}
           isAudioMuted={isAudioMuted}
           onToggleAudio={() => setIsAudioMuted((m) => !m)}
-          onAdvanceDay={handleAdvanceDay}
           onToggleBuilding={handleToggleBuilding}
           onUpgradeBuilding={handleUpgradeBuilding}
           onConstructBuilding={handleConstructBuilding}
@@ -1576,6 +1630,13 @@ export default function App() {
           isMuted={isAudioMuted}
         />
       )}
+
+      <DayTransitionOverlay
+        transition={dayTransition}
+        isMuted={isAudioMuted}
+        onActivateNextDay={handleActivateNextDayFromTransition}
+        onComplete={handleDayTransitionComplete}
+      />
     </>
   );
 }
