@@ -849,3 +849,329 @@ export function createCoastalEarthLaunchSite(maxAnisotropy: number): {
     },
   };
 }
+
+/**
+ * Heavy-Lift Stage-1 Booster & Cryogenic Propellant Tank Assembly:
+ * Wraps seamlessly around the lower spaceship section on the pad (with articulating front fairing doors
+ * that seal after crew boarding) and detaches cleanly in upper atmosphere / space.
+ */
+export function createRocketBoosterStage(maxAnisotropy: number): {
+  group: THREE.Group;
+  leftFairingDoor: THREE.Mesh;
+  rightFairingDoor: THREE.Mesh;
+  nozzleGlowMat: THREE.MeshStandardMaterial;
+  sepRingMat: THREE.MeshBasicMaterial;
+  sepRingMesh: THREE.Mesh;
+  sepLight: THREE.PointLight;
+  rcsJets: THREE.Sprite[];
+  rcsMat: THREE.SpriteMaterial;
+  setFairingClosed: (closed01: number) => void;
+  setOpacity: (opacity01: number) => void;
+  dispose: () => void;
+} {
+  const group = new THREE.Group();
+  const disposables: Array<{ dispose: () => void }> = [];
+
+  // Roll-pattern aerospace texture (white cryo body, black interstage stripes, amber decoupler line)
+  const texCanvas = document.createElement('canvas');
+  texCanvas.width = 512;
+  texCanvas.height = 512;
+  const ctx = texCanvas.getContext('2d')!;
+  ctx.fillStyle = '#e2e8f0';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Metallic rib lines
+  ctx.strokeStyle = 'rgba(71, 85, 105, 0.35)';
+  ctx.lineWidth = 3;
+  for (let y = 32; y < 512; y += 48) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(512, y);
+    ctx.stroke();
+  }
+
+  // Classic Saturn / NASA black-and-white roll pattern near upper & lower rings
+  ctx.fillStyle = '#0f172a';
+  for (let i = 0; i < 8; i++) {
+    if (i % 2 === 0) {
+      ctx.fillRect(i * 64, 0, 64, 88);
+      ctx.fillRect(i * 64, 412, 64, 100);
+    }
+  }
+  // Amber interstage separation stripe
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillRect(0, 72, 512, 16);
+
+  // Thin vertical cryo frost & telemetry markings
+  ctx.fillStyle = '#0284c7';
+  ctx.fillRect(118, 130, 14, 240);
+  ctx.fillRect(376, 130, 14, 240);
+
+  const boosterTex = new THREE.CanvasTexture(texCanvas);
+  boosterTex.wrapS = THREE.RepeatWrapping;
+  boosterTex.colorSpace = THREE.SRGBColorSpace;
+  boosterTex.anisotropy = maxAnisotropy;
+  disposables.push(boosterTex);
+
+  // Radial glow sprite texture for cold-gas RCS separation jets
+  const rcsCanvas = document.createElement('canvas');
+  rcsCanvas.width = 64;
+  rcsCanvas.height = 64;
+  const rCtx = rcsCanvas.getContext('2d')!;
+  const rGrad = rCtx.createRadialGradient(32, 32, 2, 32, 32, 32);
+  rGrad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+  rGrad.addColorStop(0.38, 'rgba(186, 230, 253, 0.72)');
+  rGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+  rCtx.fillStyle = rGrad;
+  rCtx.fillRect(0, 0, 64, 64);
+  const rcsTex = new THREE.CanvasTexture(rcsCanvas);
+  rcsTex.colorSpace = THREE.SRGBColorSpace;
+  disposables.push(rcsTex);
+
+  const hullMat = new THREE.MeshPhysicalMaterial({
+    map: boosterTex,
+    roughness: 0.34,
+    metalness: 0.35,
+    clearcoat: 0.3,
+    transparent: true,
+    opacity: 1,
+  });
+  const darkMetalMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    roughness: 0.45,
+    metalness: 0.82,
+    transparent: true,
+    opacity: 1,
+  });
+  const cryoTankMat = new THREE.MeshPhysicalMaterial({
+    color: 0xf1f5f9,
+    roughness: 0.28,
+    metalness: 0.25,
+    clearcoat: 0.42,
+    transparent: true,
+    opacity: 1,
+  });
+  const orangeDomeMat = new THREE.MeshStandardMaterial({
+    color: 0xd97706,
+    roughness: 0.52,
+    metalness: 0.22,
+    transparent: true,
+    opacity: 1,
+  });
+  const nozzleGlowMat = new THREE.MeshStandardMaterial({
+    color: 0x334155,
+    emissive: 0xf97316,
+    emissiveIntensity: 0,
+    roughness: 0.4,
+    metalness: 0.85,
+    transparent: true,
+    opacity: 1,
+  });
+
+  const fadeableMats: Array<{ mat: THREE.Material; baseOpacity: number }> = [
+    { mat: hullMat, baseOpacity: 1 },
+    { mat: darkMetalMat, baseOpacity: 1 },
+    { mat: cryoTankMat, baseOpacity: 1 },
+    { mat: orangeDomeMat, baseOpacity: 1 },
+    { mat: nozzleGlowMat, baseOpacity: 1 },
+  ];
+
+  // 1. Main Cylindrical Booster Core Skirt (leaves front +Z ramp slot openable during crew boarding)
+  const slotHalfAngle = 0.44;
+  const coreGeo = new THREE.CylinderGeometry(
+    1.72,
+    1.8,
+    1.95,
+    36,
+    1,
+    false,
+    slotHalfAngle,
+    Math.PI * 2 - slotHalfAngle * 2
+  );
+  const coreMesh = new THREE.Mesh(coreGeo, hullMat);
+  coreMesh.position.y = 1.12;
+  coreMesh.castShadow = true;
+  coreMesh.receiveShadow = true;
+  group.add(coreMesh);
+  disposables.push(coreGeo);
+
+  // Articulating Twin Front Fairing Doors (slide open for crew boarding ramp, lock shut pre-ignition)
+  const doorGeo = new THREE.CylinderGeometry(1.735, 1.815, 1.95, 12, 1, false, 0, slotHalfAngle + 0.03);
+  const leftFairingDoor = new THREE.Mesh(doorGeo, hullMat);
+  leftFairingDoor.position.y = 1.12;
+  leftFairingDoor.castShadow = true;
+  const rightFairingDoor = new THREE.Mesh(doorGeo, hullMat);
+  rightFairingDoor.position.y = 1.12;
+  rightFairingDoor.castShadow = true;
+  group.add(leftFairingDoor, rightFairingDoor);
+  disposables.push(doorGeo);
+
+  // 2. Interstage Decoupler Collar Ring (top of booster stage at y = 2.12)
+  const decouplerGeo = new THREE.TorusGeometry(1.74, 0.11, 12, 40);
+  decouplerGeo.rotateX(Math.PI / 2);
+  const decouplerRing = new THREE.Mesh(decouplerGeo, darkMetalMat);
+  decouplerRing.position.y = 2.12;
+  group.add(decouplerRing);
+  disposables.push(decouplerGeo);
+
+  // 3. Lower Aft Thrust Dome & Heat Shield Skirt (y = 0.14)
+  const aftPlateGeo = new THREE.CylinderGeometry(1.8, 1.62, 0.24, 32);
+  const aftPlate = new THREE.Mesh(aftPlateGeo, darkMetalMat);
+  aftPlate.position.y = 0.18;
+  group.add(aftPlate);
+  disposables.push(aftPlateGeo);
+
+  // 4. 5 Heavy Booster Engine Bells (4 outer gimbaled nozzles + 1 central core bell)
+  const bellGeo = new THREE.CylinderGeometry(0.2, 0.36, 0.42, 20, 1, true);
+  const bellCoords: Array<[number, number]> = [
+    [0, 0],
+    [0.95, 0],
+    [-0.95, 0],
+    [0, 0.95],
+    [0, -0.95],
+  ];
+  bellCoords.forEach(([bx, bz]) => {
+    const bell = new THREE.Mesh(bellGeo, nozzleGlowMat);
+    bell.position.set(bx, -0.06, bz);
+    group.add(bell);
+  });
+  disposables.push(bellGeo);
+
+  // 5. Twin Lateral Cryogenic Fuel Tank Boosters (left & right lower section)
+  const sideTankBodyGeo = new THREE.CylinderGeometry(0.48, 0.5, 2.35, 24);
+  const sideTankCapGeo = new THREE.ConeGeometry(0.48, 0.72, 24);
+  const sideTankBandGeo = new THREE.CylinderGeometry(0.505, 0.505, 0.22, 24);
+  const sideBellGeo = new THREE.CylinderGeometry(0.18, 0.32, 0.38, 18, 1, true);
+  const strutGeo = new THREE.BoxGeometry(0.62, 0.18, 0.22);
+  const pipeGeo = new THREE.CylinderGeometry(0.055, 0.055, 2.05, 10);
+
+  for (const sx of [-1, 1]) {
+    const pod = new THREE.Group();
+    pod.position.set(sx * 2.12, 1.25, -0.18);
+
+    const tankBody = new THREE.Mesh(sideTankBodyGeo, cryoTankMat);
+    tankBody.castShadow = true;
+    pod.add(tankBody);
+
+    const noseCap = new THREE.Mesh(sideTankCapGeo, orangeDomeMat);
+    noseCap.position.y = 1.53;
+    pod.add(noseCap);
+
+    const band = new THREE.Mesh(sideTankBandGeo, darkMetalMat);
+    band.position.y = 0.85;
+    pod.add(band);
+
+    const sideNozzle = new THREE.Mesh(sideBellGeo, nozzleGlowMat);
+    sideNozzle.position.y = -1.32;
+    pod.add(sideNozzle);
+
+    // Structural decoupler cross-struts locking tank to booster core
+    for (const sy of [-0.65, 0.65]) {
+      const strut = new THREE.Mesh(strutGeo, darkMetalMat);
+      strut.position.set(-sx * 0.36, sy, 0.05);
+      pod.add(strut);
+    }
+
+    // External LOX cryo feedline
+    const feedline = new THREE.Mesh(pipeGeo, darkMetalMat);
+    feedline.position.set(sx * 0.44, -0.05, 0.24);
+    pod.add(feedline);
+
+    group.add(pod);
+  }
+  disposables.push(sideTankBodyGeo, sideTankCapGeo, sideTankBandGeo, sideBellGeo, strutGeo, pipeGeo);
+
+  // 6. 4 Deployable Titanium Grid Fins on Upper Rim (y = 2.02)
+  const finFrameGeo = new THREE.BoxGeometry(0.46, 0.34, 0.06);
+  for (let i = 0; i < 4; i++) {
+    const ang = (i * Math.PI) / 2 + Math.PI / 4;
+    const fin = new THREE.Mesh(finFrameGeo, darkMetalMat);
+    fin.position.set(Math.cos(ang) * 1.9, 1.98, Math.sin(ang) * 1.9);
+    fin.rotation.y = -ang + Math.PI / 2;
+    fin.rotation.x = 0.22;
+    group.add(fin);
+  }
+  disposables.push(finFrameGeo);
+
+  // 7. Separation Decoupler Flash Ring & Light at y = 2.15
+  const sepRingGeo = new THREE.RingGeometry(1.5, 2.35, 40);
+  sepRingGeo.rotateX(Math.PI / 2);
+  const sepRingMat = new THREE.MeshBasicMaterial({
+    color: 0xbae6fd,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    fog: false,
+  });
+  const sepRingMesh = new THREE.Mesh(sepRingGeo, sepRingMat);
+  sepRingMesh.position.y = 2.16;
+  sepRingMesh.visible = false;
+  group.add(sepRingMesh);
+  disposables.push(sepRingGeo, sepRingMat);
+
+  const sepLight = new THREE.PointLight(0x7dd3fc, 0, 26, 1.4);
+  sepLight.position.set(0, 2.25, 0);
+  group.add(sepLight);
+
+  // 8. Upper-rim Cold-Gas RCS Separation Pusher Jets
+  const rcsMat = new THREE.SpriteMaterial({
+    map: rcsTex,
+    color: 0xe0f2fe,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    fog: false,
+  });
+  const rcsJets: THREE.Sprite[] = [];
+  const jetCoords: Array<[number, number, number]> = [
+    [1.82, 2.2, 0.3],
+    [-1.82, 2.2, 0.3],
+    [0.85, 2.2, 1.55],
+    [-0.85, 2.2, -1.55],
+  ];
+  jetCoords.forEach(([jx, jy, jz]) => {
+    const sp = new THREE.Sprite(rcsMat);
+    sp.position.set(jx, jy, jz);
+    sp.scale.set(1.65, 1.65, 1);
+    sp.visible = false;
+    group.add(sp);
+    rcsJets.push(sp);
+  });
+
+  disposables.push(hullMat, darkMetalMat, cryoTankMat, orangeDomeMat, nozzleGlowMat, rcsMat);
+
+  const setFairingClosed = (closed01: number) => {
+    const c = THREE.MathUtils.clamp(closed01, 0, 1);
+    // Swing cleanly outward left (-X) and right (+X) when open (0), sealing flush over +Z slot when closed (1)
+    rightFairingDoor.rotation.y = THREE.MathUtils.lerp(0.72, 0, c);
+    leftFairingDoor.rotation.y = THREE.MathUtils.lerp(-0.72 - slotHalfAngle, -slotHalfAngle, c);
+  };
+  setFairingClosed(0);
+
+  const setOpacity = (opacity01: number) => {
+    const o = THREE.MathUtils.clamp(opacity01, 0, 1);
+    fadeableMats.forEach(({ mat, baseOpacity }) => {
+      mat.opacity = baseOpacity * o;
+    });
+  };
+
+  return {
+    group,
+    leftFairingDoor,
+    rightFairingDoor,
+    nozzleGlowMat,
+    sepRingMat,
+    sepRingMesh,
+    sepLight,
+    rcsJets,
+    rcsMat,
+    setFairingClosed,
+    setOpacity,
+    dispose: () => {
+      disposables.forEach((d) => d.dispose());
+    },
+  };
+}

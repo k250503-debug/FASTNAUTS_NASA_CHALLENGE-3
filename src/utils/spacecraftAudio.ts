@@ -22,6 +22,7 @@ export interface SpacecraftAudioFrame {
 export interface SpacecraftAudioEngine {
   update: (frame: SpacecraftAudioFrame) => void;
   triggerIgnitionBurst: () => void;
+  triggerStageSeparation: () => void;
   triggerRcsPuff: () => void;
   triggerAltimeterPing: (urgency01: number) => void;
   triggerTouchdownImpact: () => void;
@@ -372,6 +373,62 @@ export function createSpacecraftAudioEngine(): SpacecraftAudioEngine {
         thump.stop(now + 0.72);
       } catch {
         // Ignore one-shot audio failure
+      }
+    },
+
+    triggerStageSeparation() {
+      if (lastMuted) return;
+      ensureInit();
+      if (!ctx || !masterGain || !whiteBuffer || !brownBuffer) return;
+      try {
+        const now = ctx.currentTime;
+        // 1. Pneumatic clamp decoupler mechanical thud
+        const thud = ctx.createOscillator();
+        const thudGain = ctx.createGain();
+        thud.type = 'triangle';
+        thud.frequency.setValueAtTime(140, now);
+        thud.frequency.exponentialRampToValueAtTime(38, now + 0.34);
+        thudGain.gain.setValueAtTime(0.24, now);
+        thudGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+        thud.connect(thudGain);
+        thudGain.connect(masterGain);
+        thud.start(now);
+        thud.stop(now + 0.4);
+
+        // 2. High-pressure cold-gas pusher release hiss
+        const hissSrc = ctx.createBufferSource();
+        hissSrc.buffer = whiteBuffer;
+        const hissFilter = ctx.createBiquadFilter();
+        hissFilter.type = 'bandpass';
+        hissFilter.frequency.setValueAtTime(1900, now + 0.02);
+        hissFilter.Q.setValueAtTime(0.9, now + 0.02);
+        const hissGain = ctx.createGain();
+        hissGain.gain.setValueAtTime(0.0001, now);
+        hissGain.gain.linearRampToValueAtTime(0.095, now + 0.06);
+        hissGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.85);
+        hissSrc.connect(hissFilter);
+        hissFilter.connect(hissGain);
+        hissGain.connect(masterGain);
+        hissSrc.start(now);
+        hissSrc.stop(now + 0.9);
+
+        // 3. Upper-stage vacuum engine ignition soft whoosh (~0.28s later)
+        const ignSrc = ctx.createBufferSource();
+        ignSrc.buffer = brownBuffer;
+        const ignFilter = ctx.createBiquadFilter();
+        ignFilter.type = 'lowpass';
+        ignFilter.frequency.setValueAtTime(420, now + 0.28);
+        const ignGain = ctx.createGain();
+        ignGain.gain.setValueAtTime(0.0001, now + 0.28);
+        ignGain.gain.linearRampToValueAtTime(0.18, now + 0.45);
+        ignGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.35);
+        ignSrc.connect(ignFilter);
+        ignFilter.connect(ignGain);
+        ignGain.connect(masterGain);
+        ignSrc.start(now + 0.28);
+        ignSrc.stop(now + 1.4);
+      } catch {
+        // Ignore stage separation audio failure
       }
     },
 

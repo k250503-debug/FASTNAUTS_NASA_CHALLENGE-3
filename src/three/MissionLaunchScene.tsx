@@ -25,6 +25,7 @@ import {
   createCoastalEarthLaunchSite,
   createEntryPlasmaShield,
   createRealisticEarthRig,
+  createRocketBoosterStage,
 } from './launchCinematicAssets';
 import type { PlanetId } from '../types';
 
@@ -83,8 +84,9 @@ interface MissionLaunchSceneProps {
   onComplete: (flagChoice: FlagLandingChoice) => void;
 }
 
-// Cinematic pacing: Coastal Earth Launch & Atmospheric Exit (9s) -> Earth Escape & Transit (22s) -> Realistic Planetary/Lunar Entry (13.5s) -> Disembark (8.2s)
-const BOARDING_DURATION = 9.0;
+// Cinematic pacing: Coastal Earth Launch, Booster Separation & Space Entry (12.6s) -> Earth Escape & Transit (22s) -> Realistic Planetary/Lunar Entry (13.5s) -> Disembark (8.2s)
+const BOARDING_DURATION = 12.6;
+const STAGE_SEPARATION_TIME = 8.45;
 const TRANSIT_DURATION = 22.0;
 const LANDING_DURATION = 13.5;
 const DISEMBARK_DURATION = 8.2;
@@ -157,6 +159,10 @@ const _sunGlowCol = new THREE.Color();
 const _sunGlowEndCol = new THREE.Color();
 const _sunDirVec = new THREE.Vector3();
 const _earthLookAnchor = new THREE.Vector3(-10, -8, -8);
+const _boosterUp = new THREE.Vector3();
+const _boosterBack = new THREE.Vector3();
+const _sepDeltaQuat = new THREE.Quaternion();
+const _sepDeltaEuler = new THREE.Euler();
 
 function detectSoftwareWebGL(): boolean {
   try {
@@ -440,6 +446,30 @@ export default function MissionLaunchScene({
     liftoffFlame.group.position.set(0, 0.35, 0);
     liftoffFlame.group.visible = false;
     shipBoarding.add(liftoffFlame.group);
+
+    // Stage-1 Lower Rocket Booster & Twin Cryogenic Propellant Tanks (attached to lower section until space entry)
+    const boosterStage = createRocketBoosterStage(maxAnisotropy);
+    disposables.push(boosterStage);
+
+    // Left & right Stage-1 booster exhaust plumes (shut off cleanly at MECO prior to stage separation)
+    const boosterSideFlames = [-1, 1].map((sx) => {
+      const bf = createFlameAssembly(false);
+      bf.group.position.set(sx * 2.12, -0.08, -0.18);
+      bf.group.scale.setScalar(0.68);
+      bf.light.intensity = 0;
+      bf.group.visible = false;
+      boosterStage.group.add(bf.group);
+      return bf;
+    });
+    boardingGroup.add(boosterStage.group);
+
+    // Stage separation runtime tracking state
+    let boosterDetached = false;
+    const boosterSepPos = new THREE.Vector3();
+    const boosterSepQuat = new THREE.Quaternion();
+    const boosterSepVel = new THREE.Vector3();
+    const shipLastPos = new THREE.Vector3();
+    const shipCurrentVel = new THREE.Vector3();
 
     // Prandtl-Glauert supersonic vapor condensation cone around hull at Max-Q
     const maxQConeMat = new THREE.MeshBasicMaterial({
@@ -1197,8 +1227,8 @@ export default function MissionLaunchScene({
         const liftoffStart = 4.2;
         const liftoffP = THREE.MathUtils.clamp((t - liftoffStart) / (BOARDING_DURATION - liftoffStart), 0, 1);
 
-        // Coastal twilight azure -> upper stratosphere indigo -> starry black Karman line
-        const skyAscent = THREE.MathUtils.clamp((liftoffP - 0.12) / 0.78, 0, 1);
+        // Coastal twilight azure -> upper stratosphere indigo -> starry black Karman line (reached cleanly around separation)
+        const skyAscent = THREE.MathUtils.clamp((liftoffP - 0.08) / 0.44, 0, 1);
         _zenithCol.setHex(0x0c2d5e).lerp(_zenithEndCol.setHex(0x010308), skyAscent);
         _horizonCol.setHex(0x3b82c4).lerp(_horizonEndCol.setHex(0x040916), skyAscent);
         _sunGlowCol.setHex(0xfdba74).lerp(_sunGlowEndCol.setHex(0x60a5fa), skyAscent);
@@ -1209,7 +1239,7 @@ export default function MissionLaunchScene({
         _skyColor.setHex(0x132b4d).lerp(_zenithEndCol.setHex(0x010308), skyAscent);
         scene.background = _skyColor;
         fog.color.copy(_horizonCol);
-        fog.density = THREE.MathUtils.lerp(0.0045, 0.0006, skyAscent);
+        fog.density = THREE.MathUtils.lerp(0.0045, 0.00045, skyAscent);
 
         keyLight.color.setHex(0xffe7c2);
         keyLight.intensity = 1.62;
@@ -1217,12 +1247,16 @@ export default function MissionLaunchScene({
         hemiLight.groundColor.setHex(0x1e293b);
         hemiLight.intensity = THREE.MathUtils.lerp(0.54, 0.26, skyAscent);
 
-        padStarsMat.opacity = THREE.MathUtils.smoothstep(skyAscent, 0.35, 0.95) * 0.92;
+        padStarsMat.opacity = THREE.MathUtils.smoothstep(skyAscent, 0.28, 0.92) * 0.95;
 
         // Crew boards (0..2.8s), airlock closes & ramp retracts (2.8..3.5s)
         const doorOpen = t < 2.9 ? Math.min(1, t / 0.45) : Math.max(0, 1 - (t - 2.9) / 0.45);
         const rampOpen = t < 3.0 ? 1 : Math.max(0, 1 - (t - 3.0) / 0.45);
         setShipAirlockAndRamp(shipBoarding, doorOpen, rampOpen);
+
+        // Seal the lower booster's front fairing doors seamlessly once crew ramp retracts
+        const fairingClosed = THREE.MathUtils.clamp((t - 3.05) / 0.5, 0, 1);
+        boosterStage.setFairingClosed(fairingClosed);
 
         // Retract BOTH umbilical arm and upper clamp right before ignition
         const armRetract = THREE.MathUtils.clamp((t - 3.05) / 0.65, 0, 1);
@@ -1230,24 +1264,150 @@ export default function MissionLaunchScene({
         earthLaunchSite.upperClampArm.rotation.y = -0.45 - armRetract * 1.1;
 
         const ignitionP = THREE.MathUtils.clamp((t - 3.6) / 0.65, 0, 1);
-        const shipAlt = Math.pow(liftoffP, 2.35) * 66.0;
-        const downrangeX = Math.pow(liftoffP, 2.6) * 22.0; // Eastward gravity turn over coastal ocean
+        const shipAlt = Math.pow(liftoffP, 2.35) * 116.0;
+        const downrangeX = Math.pow(liftoffP, 2.6) * 38.0; // Eastward gravity turn over coastal ocean
+
+        shipLastPos.copy(shipBoarding.position);
         shipBoarding.position.set(downrangeX, shipAlt, 0);
         shipBoarding.rotation.set(0, 0, -Math.pow(liftoffP, 1.8) * 0.52);
+        if (dt > 0.0005 && t > liftoffStart) {
+          shipCurrentVel.subVectors(shipBoarding.position, shipLastPos).divideScalar(dt);
+        }
 
-        // Max-Q Prandtl-Glauert vapor shock flash around liftoffP = 0.36..0.64
-        const maxQP = 1 - Math.abs(liftoffP - 0.5) / 0.16;
+        // Stage-1 MECO -> Stage Separation -> Stage-2 Vacuum Ignition timing
+        const sepTime = STAGE_SEPARATION_TIME;
+        const mecoP = THREE.MathUtils.clamp((t - (sepTime - 0.18)) / 0.16, 0, 1); // cutoff right before separation
+        const stage2IgnP = THREE.MathUtils.clamp((t - (sepTime + 0.28)) / 0.35, 0, 1);
+
+        // Max-Q Prandtl-Glauert vapor shock flash during mid-atmospheric climb (~t=6.2..7.6)
+        const maxQP = 1 - Math.abs(liftoffP - 0.32) / 0.12;
         maxQConeMat.opacity = maxQP > 0 ? maxQP * 0.34 : 0;
-        maxQCone.scale.setScalar(0.95 + liftoffP * 0.4);
+        maxQCone.scale.setScalar(0.95 + liftoffP * 0.45);
 
-        const flameStrength = Math.max(ignitionP * 0.55, liftoffP > 0 ? 1 : 0);
+        // Engine plumes: Stage-1 orange atmospheric burn -> brief MECO gap -> Stage-2 electric cyan vacuum plume!
+        const stage1Flame =
+          t < sepTime ? Math.max(ignitionP * 0.55, liftoffP > 0 ? 1 : 0) * (1 - mecoP) : 0;
+        const flameStrength = t < sepTime ? stage1Flame : stage2IgnP;
+
+        liftoffFlame.group.position.set(0, t < sepTime ? -0.05 : 0.35, 0);
         liftoffFlame.group.visible = flameStrength > 0.02;
         if (flameStrength > 0.02) {
           const fl = 0.9 + Math.sin(t * 44) * 0.15;
-          liftoffFlame.coreCone.scale.set(1, fl * (0.72 + liftoffP * 1.3), 1);
-          liftoffFlame.outerCone.scale.set(1.15, fl * (0.82 + liftoffP * 1.55), 1.15);
+          const isVac = t >= sepTime;
+          liftoffFlame.coreMat.color.setHex(isVac ? 0xe0f2fe : 0xfef9c3);
+          liftoffFlame.outerMat.color.setHex(isVac ? 0x38bdf8 : 0xf97316);
+          liftoffFlame.light.color.setHex(isVac ? 0x7dd3fc : 0xfb923c);
+          liftoffFlame.coreCone.scale.set(
+            isVac ? 0.92 : 1.12,
+            fl * (isVac ? 1.55 : 0.78 + liftoffP * 1.45) * flameStrength,
+            isVac ? 0.92 : 1.12
+          );
+          liftoffFlame.outerCone.scale.set(
+            isVac ? 1.45 : 1.32,
+            fl * (isVac ? 1.95 : 0.88 + liftoffP * 1.7) * flameStrength,
+            isVac ? 1.45 : 1.32
+          );
           liftoffFlame.shockDiamond.visible = liftoffP > 0.05;
           liftoffFlame.light.intensity = 7.4 * fl * flameStrength;
+        }
+
+        // Lateral booster plumes while Stage-1 is burning
+        boosterSideFlames.forEach((bf, bIdx) => {
+          bf.group.visible = stage1Flame > 0.04;
+          if (stage1Flame > 0.04) {
+            const bfl = 0.88 + Math.sin(t * 48 + bIdx * 1.4) * 0.16;
+            bf.coreCone.scale.set(1, bfl * (0.75 + liftoffP * 1.2) * stage1Flame, 1);
+            bf.outerCone.scale.set(1.15, bfl * (0.85 + liftoffP * 1.45) * stage1Flame, 1.15);
+            bf.shockDiamond.visible = liftoffP > 0.05;
+          }
+        });
+
+        // Booster attachment vs. realistic separation physics in space!
+        if (t < sepTime) {
+          boosterDetached = false;
+          boosterStage.group.visible = true;
+          boosterStage.setOpacity(1);
+          boosterStage.group.position.copy(shipBoarding.position);
+          boosterStage.group.quaternion.copy(shipBoarding.quaternion);
+          boosterStage.nozzleGlowMat.emissiveIntensity =
+            flameStrength > 0.05 ? 0.75 + 0.55 * mecoP : 0;
+          boosterStage.sepRingMesh.visible = false;
+          boosterStage.sepLight.intensity = 0;
+          boosterStage.rcsJets.forEach((sp) => {
+            sp.visible = false;
+          });
+        } else {
+          if (!boosterDetached) {
+            boosterDetached = true;
+            boosterSepPos.copy(shipBoarding.position);
+            boosterSepQuat.copy(shipBoarding.quaternion);
+
+            // Compute ship's local Up & Back vectors in world space for realistic axial push-off
+            _boosterUp.set(0, 1, 0).applyQuaternion(boosterSepQuat).normalize();
+            _boosterBack.set(0, 0, 1).applyQuaternion(boosterSepQuat).normalize();
+
+            // Start with ship's momentum minus pneumatic pusher separation velocity (-Y & slight -Z)
+            boosterSepVel
+              .copy(shipCurrentVel)
+              .addScaledVector(_boosterUp, -3.2)
+              .addScaledVector(_boosterBack, -0.55);
+
+            if (!firedSfxEvents.has('stage-separation')) {
+              firedSfxEvents.add('stage-separation');
+              spaceAudio.triggerStageSeparation();
+            }
+          }
+
+          const sepAge = t - sepTime;
+
+          // Subtle deceleration & gravity pull relative to accelerating Starship so booster drifts cleanly downward/away
+          boosterSepVel.y -= 2.15 * dt;
+          boosterSepPos.addScaledVector(boosterSepVel, dt);
+
+          // Gentle vacuum tumble rotation on all 3 axes as detached booster drifts away
+          _sepDeltaEuler.set(0.26 * dt, 0.14 * dt, 0.22 * dt);
+          _sepDeltaQuat.setFromEuler(_sepDeltaEuler);
+          boosterSepQuat.multiply(_sepDeltaQuat);
+
+          boosterStage.group.position.copy(boosterSepPos);
+          boosterStage.group.quaternion.copy(boosterSepQuat);
+
+          // Glowing booster engine bells cool down smoothly from bright orange to dark titanium
+          boosterStage.nozzleGlowMat.emissiveIntensity = Math.max(0, 1.85 * Math.exp(-sepAge * 0.85));
+
+          // Separation decoupler flash ring + light pulse (0 .. 0.55s)
+          const flashP = THREE.MathUtils.clamp(sepAge / 0.55, 0, 1);
+          if (flashP < 1) {
+            boosterStage.sepRingMesh.visible = true;
+            boosterStage.sepRingMesh.scale.setScalar(1 + flashP * 1.45);
+            boosterStage.sepRingMat.opacity = (1 - flashP) * 0.88;
+            boosterStage.sepLight.intensity = (1 - flashP) * 8.5;
+          } else {
+            boosterStage.sepRingMesh.visible = false;
+            boosterStage.sepLight.intensity = 0;
+          }
+
+          // Cold-gas RCS separation thruster puffs at detach (0..1.4s) + gentle attitude burst around 2.1..2.6s
+          const initRcs = sepAge < 1.4 ? Math.sin((sepAge / 1.4) * Math.PI) * 0.82 : 0;
+          const attitudeRcs =
+            sepAge > 2.05 && sepAge < 2.65
+              ? Math.sin(((sepAge - 2.05) / 0.6) * Math.PI) * 0.45
+              : 0;
+          const rcsAlpha = Math.max(initRcs, attitudeRcs);
+          boosterStage.rcsMat.opacity = rcsAlpha;
+          boosterStage.rcsJets.forEach((sp, jIdx) => {
+            sp.visible = rcsAlpha > 0.03;
+            if (sp.visible) {
+              const pulse = 0.85 + Math.sin(sepAge * 26 + jIdx * 1.7) * 0.25;
+              sp.scale.setScalar((1.35 + rcsAlpha * 0.9) * pulse);
+            }
+          });
+
+          // Stay crisp and visible for ~3.5 seconds, then fade smoothly before transit cut
+          const fadeAlpha =
+            sepAge < 3.4 ? 1 : Math.max(0, 1 - (sepAge - 3.4) / 0.7);
+          boosterStage.setOpacity(fadeAlpha);
+          boosterStage.group.visible = fadeAlpha > 0.01;
         }
 
         // Takeoff realistic voices & multi-stage rocket audio
@@ -1261,15 +1421,22 @@ export default function MissionLaunchScene({
         if (t >= 3.2) {
           triggerVoiceCue(
             'takeoff-ignition',
-            'Umbilicals retracted. Three, two, one... main engine ignition and liftoff!',
+            'Umbilicals retracted. Three, two, one... main booster ignition and liftoff!',
             { queue: true }
           );
         }
-        if (t >= 6.45) {
+        if (t >= 6.1) {
           triggerVoiceCue(
             'takeoff-maxq',
-            'Tower cleared. Pitch program nominal, passing Max Q toward Earth orbit.',
+            'Tower cleared. Pitch program nominal, passing Max Q toward the Karman line.',
             { queue: true }
+          );
+        }
+        if (t >= sepTime - 0.1) {
+          triggerVoiceCue(
+            'takeoff-meco-sep',
+            'Main engine cutoff. Booster stage separation confirmed — upper stage vacuum ignition!',
+            { queue: true, urgent: true }
           );
         }
 
@@ -1278,13 +1445,17 @@ export default function MissionLaunchScene({
           spaceAudio.triggerIgnitionBurst();
         }
 
-        audioLoxLevel = Math.max(0.08, 0.72 * Math.max(0, 1 - liftoffP * 4.2));
-        audioThrustLevel = flameStrength * THREE.MathUtils.lerp(1.0, 0.62, Math.max(0, liftoffP - 0.55) / 0.45);
-        audioCrackleLevel = flameStrength * Math.max(0.25, 1 - liftoffP * 0.68);
+        audioLoxLevel = Math.max(0.06, 0.72 * Math.max(0, 1 - liftoffP * 4.5));
+        audioThrustLevel =
+          t < sepTime
+            ? flameStrength * THREE.MathUtils.lerp(1.0, 0.72, Math.max(0, liftoffP - 0.25) / 0.3)
+            : flameStrength * 0.62;
+        audioCrackleLevel =
+          t < sepTime ? flameStrength * Math.max(0.25, 1 - liftoffP * 0.85) : flameStrength * 0.14;
         audioMaxQLevel = maxQP > 0 ? maxQP : 0;
 
         // LOX cryogenic chilldown steam venting pre-ignition
-        const loxFade = Math.max(0, 1 - liftoffP * 4.5);
+        const loxFade = Math.max(0, 1 - liftoffP * 5.0);
         loxMat.opacity = 0.42 * loxFade;
         if (loxFade > 0.01) {
           const lxAttr = loxGeo.attributes.position as THREE.BufferAttribute;
@@ -1298,7 +1469,7 @@ export default function MissionLaunchScene({
         }
 
         // Deluge flame trench blast steam clouds
-        const smokeStrength = ignitionP * Math.max(0.05, 1 - liftoffP * 0.95);
+        const smokeStrength = ignitionP * Math.max(0.05, 1 - liftoffP * 1.45);
         padSmokeMat.opacity = smokeStrength * 0.48;
         if (smokeStrength > 0.01) {
           const psAttr = padSmokeGeo.attributes.position as THREE.BufferAttribute;
@@ -1349,8 +1520,9 @@ export default function MissionLaunchScene({
           setStormOverlayLevel(0);
         }
 
-        // Camera shifts smoothly from coastal launchpad crew framing -> soaring chase-cam climbing into space!
-        const shakeAmt = liftoffP > 0.01 ? 0.11 * (1 - liftoffP * 0.55) : 0;
+        // Camera shifts smoothly from coastal launchpad crew framing -> soaring chase-cam keeping both Starship & separating booster framed cleanly!
+        const shakeAmt =
+          liftoffP > 0.01 ? 0.11 * (t < sepTime ? 1 - liftoffP * 0.55 : 0.22) : 0;
         const preLiftCam = THREE.MathUtils.clamp(t / liftoffStart, 0, 1);
         if (liftoffP <= 0.01) {
           _camPos.set(
@@ -1360,16 +1532,17 @@ export default function MissionLaunchScene({
           );
           _camLook.set(0, THREE.MathUtils.lerp(1.9, 3.2, preLiftCam), THREE.MathUtils.lerp(3.2, 0.2, preLiftCam));
         } else {
-          // Dramatic tracking camera orbiting higher and looking down past roaring engines toward Earth coast below
           const climbEase = liftoffP * liftoffP * (3 - 2 * liftoffP);
+          // Smoothly widen Z slightly around separation (liftoffP ~ 0.50..0.92) so detached booster remains visible in lower frame!
+          const sepCamWiden = Math.sin(THREE.MathUtils.clamp((liftoffP - 0.38) / 0.62, 0, 1) * Math.PI) * 4.2;
           _camPos.set(
-            downrangeX + THREE.MathUtils.lerp(9.2, -9.5, climbEase) + Math.sin(t * 49) * shakeAmt,
-            shipAlt + THREE.MathUtils.lerp(3.8, 5.2, climbEase) + Math.cos(t * 43) * shakeAmt,
-            THREE.MathUtils.lerp(13.8, 12.6, climbEase)
+            downrangeX + THREE.MathUtils.lerp(9.2, -10.5, climbEase) + Math.sin(t * 49) * shakeAmt,
+            shipAlt + THREE.MathUtils.lerp(3.8, 4.6, climbEase) + Math.cos(t * 43) * shakeAmt,
+            THREE.MathUtils.lerp(13.8, 14.2, climbEase) + sepCamWiden
           );
           _camLook.set(
-            downrangeX * THREE.MathUtils.lerp(0.85, 1.0, climbEase),
-            shipAlt + THREE.MathUtils.lerp(2.8, 1.2, climbEase),
+            downrangeX * THREE.MathUtils.lerp(0.85, 0.96, climbEase),
+            shipAlt + THREE.MathUtils.lerp(2.8, 0.2, climbEase),
             0
           );
         }
